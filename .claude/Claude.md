@@ -23,13 +23,15 @@ finance-dashboard/
 ├── docs/
 │   ├── progress.md      # 更新或查阅项目进度与待办事项
 │   ├── schema.md        # 查阅项目后端数据架构与契约
-│   └── frontend.md      # 查阅项目前端设计
+│   ├── process.md       # 查阅项目后端数据处理用于前端显示的架构与契约
+│   └── frontend.md      # 查阅项目前端设计架构与契约
 ├── src/
 │   ├── backend/
 │   └── frontend/
 ├── data/
 │   ├── raw_input/       # 存放银行账单 PDF
-│   ├── database/        # 存放所有 JSON 文件
+│   ├── database/        # 存放 accounts/parsed/transactions.json 文件
+│   ├── ui/              # 存放前端显示相关 JSON 文件
 │   └── logs/
 ├── .gitignore
 └── .env
