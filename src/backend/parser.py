@@ -8,6 +8,7 @@ import re
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 import fitz
@@ -21,6 +22,8 @@ BASE_URL = "https://token-plan-cn.xiaomimimo.com/anthropic"
 DPI = 200
 MAX_RETRIES = 3
 RETRY_DELAY = 5
+IMAGE_GROUP_SIZE = 2
+MAX_WORKERS = 5
 
 TZ_CST = timezone(timedelta(hours=8))
 
@@ -91,6 +94,61 @@ def render_pdf_to_images(pdf_path: Path) -> List[str]:
     return images
 
 
+def split_images_into_groups(images: List[str], group_size: int = IMAGE_GROUP_SIZE) -> List[List[str]]:
+    return [images[i:i + group_size] for i in range(0, len(images), group_size)]
+
+
+def _call_ai_with_retry(
+    client: Anthropic,
+    system_prompt: str,
+    images: List[str],
+    logger: logging.Logger,
+    group_label: str,
+    is_last_single_page: bool = False,
+) -> Tuple[Optional[List[Dict[str, Any]]], bool]:
+    """Call AI for one image group with up to MAX_RETRIES attempts.
+
+    Returns (txns, valid_empty):
+      - txns is a list on success (may be empty if valid_empty is True)
+      - txns is None on failure
+      - valid_empty is True only when the last group has 1 page and all
+        attempts returned no valid transactions (not API errors)
+    """
+    last_was_no_txns = False
+    for attempt in range(1, MAX_RETRIES + 1):
+        logger.info("%s attempt %d/%d", group_label, attempt, MAX_RETRIES)
+        response_text = call_ai(client, system_prompt, images, logger)
+        if not response_text:
+            logger.error("%s attempt %d: API error (no response)", group_label, attempt)
+            last_was_no_txns = False
+            continue
+        txns = parse_ai_response(response_text)
+        if txns:
+            logger.info("%s attempt %d: extracted %d transactions", group_label, attempt, len(txns))
+            return txns, False
+        logger.warning("%s attempt %d: no valid transactions", group_label, attempt)
+        last_was_no_txns = True
+
+    if is_last_single_page and last_was_no_txns:
+        logger.info("%s: last group, 1 page, no transactions found — accepted as valid empty", group_label)
+        return [], True
+    return None, False
+
+
+def _call_ai_worker(args: Tuple[int, int, int, List[str], str, str, str]) -> Tuple[int, Optional[List[Dict[str, Any]]], bool]:
+    gi, total_groups, total_pages, group, system_prompt, api_key, base_url = args
+    client = Anthropic(api_key=api_key, base_url=base_url)
+    logger = setup_logger()
+    is_last = gi == total_groups - 1
+    is_single_page = len(group) == 1
+    label = "Worker group %d/%d (%d images)" % (gi + 1, total_groups, len(group))
+    logger.info(label)
+    return gi, *_call_ai_with_retry(
+        client, system_prompt, group, logger, label,
+        is_last_single_page=(is_last and is_single_page),
+    )
+
+
 # ---------------------------------------------------------------------------
 # API Interaction
 # ---------------------------------------------------------------------------
@@ -147,6 +205,59 @@ def call_ai(
                 time.sleep(RETRY_DELAY)
     logger.error("All %d API attempts failed", MAX_RETRIES)
     return None
+
+
+def call_ai_grouped(
+    client: Anthropic,
+    system_prompt: str,
+    images: List[str],
+    logger: logging.Logger,
+    api_key: str,
+) -> Optional[str]:
+    groups = split_images_into_groups(images)
+    total_pages = len(images)
+
+    # Single group — still use retry logic, no process pool needed
+    if len(groups) == 1:
+        is_single_page = total_pages == 1
+        txns, valid_empty = _call_ai_with_retry(
+            client, system_prompt, groups[0], logger,
+            "Single group (%d images)" % total_pages,
+            is_last_single_page=is_single_page,
+        )
+        if txns is None:
+            return None
+        return json.dumps(txns, ensure_ascii=False)
+
+    # Multiple groups — use process pool
+    logger.info("Splitting %d pages into %d groups (max %d per group), up to %d workers",
+                total_pages, len(groups), IMAGE_GROUP_SIZE, MAX_WORKERS)
+
+    tasks = [
+        (gi, len(groups), total_pages, group, system_prompt, api_key, BASE_URL)
+        for gi, group in enumerate(groups)
+    ]
+
+    results: Dict[int, Tuple[Optional[List[Dict[str, Any]]], bool]] = {}
+    with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        futures = {executor.submit(_call_ai_worker, args): args[0] for args in tasks}
+        for future in as_completed(futures):
+            try:
+                gi, txns, valid_empty = future.result()
+            except Exception as exc:
+                logger.error("Worker process exception: %s", exc)
+                return None
+            results[gi] = (txns, valid_empty)
+
+    all_txns: List[Dict[str, Any]] = []
+    for gi in range(len(groups)):
+        txns, valid_empty = results[gi]
+        if txns is None:
+            logger.error("Group %d/%d failed — aborting PDF", gi + 1, len(groups))
+            return None
+        all_txns.extend(txns)
+
+    return json.dumps(all_txns, ensure_ascii=False)
 
 
 def parse_ai_response(response_text: str) -> Optional[List[Dict[str, Any]]]:
@@ -486,8 +597,8 @@ def main() -> None:
             logger.error("Failed to render PDF %s: %s", pdf_path.name, exc)
             continue
 
-        # Call AI API
-        response_text = call_ai(client, system_prompt, images, logger)
+        # Call AI API (split into groups if > IMAGE_GROUP_SIZE pages)
+        response_text = call_ai_grouped(client, system_prompt, images, logger, api_key)
         if not response_text:
             logger.error("No response from AI for %s", pdf_path.name)
             continue

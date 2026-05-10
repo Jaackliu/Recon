@@ -47,28 +47,9 @@ Each element must be an object with these exact fields:
 
 ### category
 Assign exactly one category from the allowed lists below. Choose the best match based on the transaction description.
-Each transaction MUST have exactly one category from the lists — no other categories, no empty category.
 
-Expense categories (with examples):
-- 交通: flights, trains, metro, taxi, car rental, fuel/EV charging, tolls, transit cards
-- 餐饮: meals (breakfast/lunch/dinner), beverages, takeout, groceries, cafeteria cards, dining out
-- 生活: laundry, courier/delivery, haircut, education/supplies, medical/healthcare
-- 购物: clothing, accessories, household items, consumables, electronics
-- 居住: rent, water bill, electricity bill, property fees
-- 文娱旅游: hotels, attraction tickets, concerts/shows, travel packages
-- 订阅: cloud storage, music/video streaming, software subscriptions
-- 通讯: phone bills, internet bills
-- 行政: school fees, government fees, visa fees
-- 外部转账: transfers to/from external accounts
-- 其他: anything that does not fit the above, or cannot be identified
-
-Income categories (with examples):
-- 外部转账: transfers from external accounts
-- 工资: salary from work, internships, school employment
-- 奖学金: scholarships from school or government
-- 补助: grants/subsidies from projects, school, or government
-- 税息: tax refunds, interest income
-- 其他: anything that does not fit the above, or cannot be identified
+Expense categories: 交通, 餐饮, 生活, 购物, 居住, 文娱旅游, 订阅, 通讯, 行政, 外部转账, 其他
+Income categories: 外部转账, 工资, 奖学金, 补助, 税息, 其他
 
 ### description
 A concise summary of the transaction: merchant name, counterparty, or purpose.
