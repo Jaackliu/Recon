@@ -566,8 +566,9 @@ function updateSankey() {
   const links = [];
 
   Object.keys(income).forEach((category) => {
-    nodes.add(category);
-    links.push({ source: category, target: "Total Income", value: income[category] });
+    const nodeName = `收入: ${category}`;
+    nodes.add(nodeName);
+    links.push({ source: nodeName, target: "Total Income", value: income[category] });
   });
 
   nodes.add("Total Income");
@@ -588,8 +589,9 @@ function updateSankey() {
   }
 
   Object.keys(expense).forEach((category) => {
-    nodes.add(category);
-    links.push({ source: "Total Expense", target: category, value: expense[category] });
+    const nodeName = `支出: ${category}`;
+    nodes.add(nodeName);
+    links.push({ source: "Total Expense", target: nodeName, value: expense[category] });
   });
 
   const option = {
