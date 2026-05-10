@@ -334,30 +334,54 @@ input {
   border-radius: var(--radius-md);
   border: 1px solid var(--hairline);
   box-shadow: var(--shadow);
-  padding: var(--space-lg);
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: var(--space-base);
-  min-height: 180px;
+  gap: 12px;
+  min-height: 160px;
+}
+
+.balance-card,
+.cashflow-card,
+.heatmap-card,
+.monthly-card {
+  min-height: 150px;
+}
+
+.heatmap-card {
+  position: relative;
+  padding-bottom: 36px;
 }
 
 .card-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-base);
 }
 
+.card-header > div {
+  min-width: 0;
+  flex: 1;
+}
+
 .eyebrow {
-  font-size: 12px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .card-title {
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .delta {
@@ -367,6 +391,7 @@ input {
   border-radius: var(--radius-full);
   background: var(--surface-soft);
   color: var(--muted);
+  align-self: flex-start;
 }
 
 .delta.is-positive {
@@ -380,12 +405,14 @@ input {
 }
 
 .balance-value {
-  font-size: 32px;
+  font-size: 28px;
   font-weight: 600;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .balance-meta {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--muted);
 }
 
@@ -409,6 +436,8 @@ input {
 .cashflow-value {
   font-size: 28px;
   font-weight: 600;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .metric-list {
@@ -421,30 +450,86 @@ input {
   display: grid;
   grid-template-columns: 1fr auto auto;
   gap: 8px;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--body);
+  align-items: center;
 }
 
 .metric-value {
   font-weight: 600;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .metric-ratio {
   color: var(--muted);
+  white-space: nowrap;
 }
 
 .chart {
   width: 100%;
-  height: 200px;
+  height: 180px;
 }
 
 .chart-tall {
   height: 260px;
 }
 
+.heatmap-card .chart,
+.monthly-card .chart {
+  height: 160px;
+}
+
 .legend {
   font-size: 12px;
   color: var(--muted);
+}
+
+.heatmap-legend {
+  position: absolute;
+  right: 16px;
+  bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.legend-label {
+  font-size: 11px;
+}
+
+.legend-squares {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--surface-soft);
+}
+
+.legend-swatch.level-0 {
+  background: #2f80ed;
+}
+
+.legend-swatch.level-1 {
+  background: #9fc2ff;
+}
+
+.legend-swatch.level-2 {
+  background: #f7f7f7;
+}
+
+.legend-swatch.level-3 {
+  background: #ff9aa7;
+}
+
+.legend-swatch.level-4 {
+  background: var(--rausch);
 }
 
 .chip-group {
@@ -770,6 +855,14 @@ input {
     flex-direction: column;
     align-items: flex-start;
     height: auto;
+  }
+
+  .card-title {
+    white-space: normal;
+  }
+
+  .eyebrow {
+    white-space: normal;
   }
 
   .dashboard-grid {

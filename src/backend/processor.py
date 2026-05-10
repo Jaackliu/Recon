@@ -373,6 +373,10 @@ def main() -> None:
     transactions = normalize_transactions(transactions_raw)
     transactions_by_account = group_by_account(transactions)
 
+    global_end_date: Optional[datetime.date] = None
+    if transactions:
+        global_end_date = max(tx["_date"] for tx in transactions)
+
     if accounts_path.exists():
         accounts_raw = load_json(accounts_path)
         account_codes = [item["account_code"] for item in accounts_raw]
@@ -387,7 +391,7 @@ def main() -> None:
             daily_series[account_code] = []
             continue
         start_date = account_txs[0]["_date"]
-        end_date = account_txs[-1]["_date"]
+        end_date = global_end_date or account_txs[-1]["_date"]
         daily_series[account_code] = build_daily_series(
             account_txs,
             start_date,

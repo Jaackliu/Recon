@@ -345,24 +345,35 @@ function updateHeatmap() {
 
   const data = staticData.heatmap.map((entry) => [entry.date, entry.net_inflow]);
   const values = staticData.heatmap.map((entry) => entry.net_inflow);
-  const minValue = Math.min(...values, 0);
-  const maxValue = Math.max(...values, 0);
+  const minValue = Math.min(...values);
+  const maxValue = Math.max(...values);
+  const maxAbs = Math.max(Math.abs(minValue), Math.abs(maxValue), 1);
+  const chartWidth = state.charts.heatmap.getWidth();
+  const chartHeight = state.charts.heatmap.getHeight();
+  const columns = Math.max(1, Math.ceil(staticData.heatmap.length / 7));
+  const cellWidth = Math.floor((chartWidth - 24) / columns);
+  const cellHeight = Math.floor((chartHeight - 24) / 7);
+  const cellSize = Math.max(Math.min(cellWidth, cellHeight), 8);
 
   const option = {
     tooltip: {
       formatter: (params) => `${params.data[0]}<br/>${formatMoney(params.data[1])}`
     },
     visualMap: {
-      min: minValue,
-      max: maxValue,
+      min: -maxAbs,
+      max: maxAbs,
       show: false,
       inRange: {
-        color: ["#f7f7f7", "#ff385c"]
+        color: ["#2f80ed", "#f7f7f7", "#ff385c"]
       }
     },
     calendar: {
       range: [staticData.heatmap[0].date, staticData.heatmap[staticData.heatmap.length - 1].date],
-      cellSize: [14, 14],
+      cellSize: [cellSize, cellSize],
+      top: 6,
+      left: 6,
+      right: 6,
+      bottom: 6,
       itemStyle: {
         borderColor: "#ebebeb",
         borderWidth: 1
@@ -371,7 +382,7 @@ function updateHeatmap() {
         show: false
       },
       yearLabel: { show: false },
-      monthLabel: { show: true, color: "#6a6a6a" },
+      monthLabel: { show: true, color: "#6a6a6a", fontSize: 10, margin: 6 },
       dayLabel: { show: false }
     },
     series: [{
@@ -396,21 +407,22 @@ function updateMonthlyChart() {
   const option = {
     tooltip: { trigger: "axis" },
     legend: { show: false },
+    grid: { left: 38, right: 16, top: 22, bottom: 26, containLabel: true },
     xAxis: {
       type: "category",
       data: months,
       axisLine: { lineStyle: { color: "#dddddd" } },
-      axisLabel: { color: "#6a6a6a" }
+      axisLabel: { color: "#6a6a6a", fontSize: 10 }
     },
     yAxis: [
       {
         type: "value",
-        axisLabel: { color: "#6a6a6a" },
+        axisLabel: { color: "#6a6a6a", fontSize: 10 },
         splitLine: { lineStyle: { color: "#ebebeb" } }
       },
       {
         type: "value",
-        axisLabel: { color: "#6a6a6a" },
+        axisLabel: { color: "#6a6a6a", fontSize: 10 },
         splitLine: { show: false }
       }
     ],
@@ -421,7 +433,8 @@ function updateMonthlyChart() {
         data: inflow,
         yAxisIndex: 1,
         itemStyle: { color: "#ff385c" },
-        stack: "flow"
+        stack: "flow",
+        barWidth: 24
       },
       {
         name: "Outflow",
@@ -429,7 +442,8 @@ function updateMonthlyChart() {
         data: outflow,
         yAxisIndex: 1,
         itemStyle: { color: "rgba(34,34,34,0.35)" },
-        stack: "flow"
+        stack: "flow",
+        barWidth: 24
       },
       {
         name: "Balance",
@@ -450,9 +464,13 @@ function updateDailyChart(slice) {
   const balances = slice.map((entry) => entry.end_balance);
   const inflow = slice.map((entry) => entry.filtered_inflow);
   const outflow = slice.map((entry) => entry.filtered_outflow);
+  const balanceMin = Math.min(...balances);
+  const balanceMax = Math.max(...balances);
+  const balancePad = Math.max((balanceMax - balanceMin) * 0.08, balanceMax * 0.002, 1);
 
   const option = {
     tooltip: { trigger: "axis" },
+    grid: { left: 48, right: 28, top: 28, bottom: 30, containLabel: true },
     xAxis: {
       type: "category",
       data: dates,
@@ -462,6 +480,9 @@ function updateDailyChart(slice) {
     yAxis: [
       {
         type: "value",
+        min: balanceMin - balancePad,
+        max: balanceMax + balancePad,
+        scale: true,
         axisLabel: { color: "#6a6a6a" },
         splitLine: { lineStyle: { color: "#ebebeb" } }
       },

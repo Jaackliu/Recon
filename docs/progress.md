@@ -18,6 +18,8 @@
   - Apply Airbnb-inspired visual system (Rausch accent, soft radii, single shadow tier).
 - Status:
   - Frontend scaffold and data bindings completed.
+  - UI sizing and chart axis/legend tweaks applied.
+  - Processor extends per-account series to global end date for total asset ffill.
 
 ## Plan
 - [x] Implement src/backend/processor.py to generate UI JSON files.
