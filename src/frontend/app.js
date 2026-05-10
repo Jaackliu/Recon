@@ -49,7 +49,6 @@ const dom = {
   transferValue: document.getElementById("transferValue"),
   heatmapLegend: document.getElementById("heatmapLegend"),
   donutLegend: document.getElementById("donutLegend"),
-  topList: document.getElementById("topList"),
   transactionSort: document.getElementById("transactionSort"),
   transactionsList: document.getElementById("transactionsList"),
   transactionFilters: document.getElementById("transactionFilters"),
@@ -339,20 +338,31 @@ function updateCashflow(slice) {
   dom.outflowRatio.textContent = formatRatio(outflow, startBalance, "-");
 }
 
+function percentile(arr, p) {
+  const sorted = [...arr].sort((a, b) => a - b);
+  const idx = (p / 100) * (sorted.length - 1);
+  const lo = Math.floor(idx);
+  const hi = Math.ceil(idx);
+  if (lo === hi) return sorted[lo];
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+}
+
 function updateHeatmap() {
   const staticData = state.data.staticCharts[state.account];
   if (!staticData || !staticData.heatmap || staticData.heatmap.length === 0) return;
 
   const data = staticData.heatmap.map((entry) => [entry.date, entry.net_inflow]);
   const values = staticData.heatmap.map((entry) => entry.net_inflow);
-  const minValue = Math.min(...values);
-  const maxValue = Math.max(...values);
-  const maxAbs = Math.max(Math.abs(minValue), Math.abs(maxValue), 1);
+
+  const p5 = percentile(values, 5);
+  const p95 = percentile(values, 95);
+  const rangeAbs = Math.max(Math.abs(p5), Math.abs(p95), 1);
+
   const chartWidth = state.charts.heatmap.getWidth();
   const chartHeight = state.charts.heatmap.getHeight();
   const columns = Math.max(1, Math.ceil(staticData.heatmap.length / 7));
-  const cellWidth = Math.floor((chartWidth - 24) / columns);
-  const cellHeight = Math.floor((chartHeight - 24) / 7);
+  const cellWidth = Math.floor((chartWidth - 20) / columns);
+  const cellHeight = Math.floor((chartHeight - 28) / 7);
   const cellSize = Math.max(Math.min(cellWidth, cellHeight), 8);
 
   const option = {
@@ -360,29 +370,38 @@ function updateHeatmap() {
       formatter: (params) => `${params.data[0]}<br/>${formatMoney(params.data[1])}`
     },
     visualMap: {
-      min: -maxAbs,
-      max: maxAbs,
+      min: -rangeAbs,
+      max: rangeAbs,
       show: false,
       inRange: {
-        color: ["#2f80ed", "#f7f7f7", "#ff385c"]
+        color: ["#2f80ed", "#9fc2ff", "#ebedf0", "#ff9aa7", "#ff385c"]
       }
     },
     calendar: {
       range: [staticData.heatmap[0].date, staticData.heatmap[staticData.heatmap.length - 1].date],
       cellSize: [cellSize, cellSize],
-      top: 6,
+      top: 18,
       left: 6,
       right: 6,
       bottom: 6,
+      orient: "horizontal",
       itemStyle: {
-        borderColor: "#ebebeb",
-        borderWidth: 1
+        borderColor: "#ffffff",
+        borderWidth: 2,
+        borderRadius: 2
       },
       splitLine: {
         show: false
       },
       yearLabel: { show: false },
-      monthLabel: { show: true, color: "#6a6a6a", fontSize: 10, margin: 6 },
+      monthLabel: {
+        show: true,
+        color: "#6a6a6a",
+        fontSize: 10,
+        margin: 4,
+        nameMap: "en",
+        position: "start"
+      },
       dayLabel: { show: false }
     },
     series: [{
@@ -624,7 +643,6 @@ function updateCategoryPanel() {
 
   state.charts.donut.setOption(option, true);
   renderDonutLegend(donutData);
-  renderTopList(filtered);
 }
 
 function updateTransactionsView() {
@@ -797,28 +815,6 @@ function renderDonutLegend(data) {
     div.className = "legend-item";
     div.innerHTML = `<span class="legend-swatch" style="background:${item.itemStyle.color}"></span>${escapeHtml(item.name)}`;
     dom.donutLegend.appendChild(div);
-  });
-}
-
-function renderTopList(items) {
-  const topFive = [...items].sort((a, b) => b.amount - a.amount).slice(0, 5);
-  dom.topList.innerHTML = "";
-  if (topFive.length === 0) {
-    dom.topList.innerHTML = `<div class="top-item">No data in range.</div>`;
-    return;
-  }
-
-  topFive.forEach((item) => {
-    const row = document.createElement("div");
-    row.className = "top-item";
-    row.innerHTML = `
-      <div>
-        <strong>${escapeHtml(item.description)}</strong>
-        <div class="meta">${escapeHtml(item.category)} - ${escapeHtml(item.date)}</div>
-      </div>
-      <div>${formatMoney(item.amount)}</div>
-    `;
-    dom.topList.appendChild(row);
   });
 }
 

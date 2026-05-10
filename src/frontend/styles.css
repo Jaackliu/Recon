@@ -385,9 +385,9 @@ input {
 }
 
 .delta {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
-  padding: 6px 10px;
+  padding: 3px 8px;
   border-radius: var(--radius-full);
   background: var(--surface-soft);
   color: var(--muted);
@@ -405,7 +405,7 @@ input {
 }
 
 .balance-value {
-  font-size: 28px;
+  font-size: 25px;
   font-weight: 600;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -434,7 +434,7 @@ input {
 }
 
 .cashflow-value {
-  font-size: 28px;
+  font-size: 25px;
   font-weight: 600;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -521,7 +521,7 @@ input {
 }
 
 .legend-swatch.level-2 {
-  background: #f7f7f7;
+  background: #ebedf0;
 }
 
 .legend-swatch.level-3 {
@@ -529,7 +529,7 @@ input {
 }
 
 .legend-swatch.level-4 {
-  background: var(--rausch);
+  background: #ff385c;
 }
 
 .chip-group {
@@ -555,8 +555,8 @@ input {
 .toggle-btn {
   border: none;
   background: transparent;
-  padding: 6px 14px;
-  font-size: 13px;
+  padding: 4px 10px;
+  font-size: 12px;
   cursor: pointer;
   color: var(--muted);
 }
