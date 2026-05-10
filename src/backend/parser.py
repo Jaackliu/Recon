@@ -568,15 +568,6 @@ def main() -> None:
     write_json(PARSED_PATH, parsed_entries)
     logger.info("Updated parsed.json with %d new entries", len(new_parsed_entries))
 
-    # Run processor
-    logger.info("Running processor.py to regenerate UI data...")
-    try:
-        from processor import main as run_processor
-        run_processor()
-        logger.info("Processor completed successfully")
-    except Exception as exc:
-        logger.error("Processor failed: %s", exc)
-
     logger.info("Parser finished. %d new transactions added from %d PDFs.",
                 len(all_new_txns) + len(fee_txns), len(unprocessed))
     logger.info("=" * 60)
