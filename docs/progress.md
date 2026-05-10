@@ -8,6 +8,17 @@
   - Include accounts even if they have no transactions.
   - Logs write to data/logs.
 
+## 2026-05-10
+- Current focus: build frontend dashboard and transactions view.
+- Plan:
+  - Create src/frontend with index, styles, and app logic.
+  - Implement layout per docs/frontend.md and draft.png.
+  - Bind data from data/ui and data/database JSON files.
+  - Implement time range, account, sort, and filter interactions.
+  - Apply Airbnb-inspired visual system (Rausch accent, soft radii, single shadow tier).
+- Status:
+  - Frontend scaffold and data bindings completed.
+
 ## Plan
 - [x] Implement src/backend/processor.py to generate UI JSON files.
 - [x] Create data/ui output directory.

@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Personal Finance Dashboard</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <div class="app">
+      <header class="top-nav">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <div>
+            <div class="brand-title">Finance Dashboard</div>
+            <div class="brand-subtitle" id="lastUpdated">Data up to --</div>
+          </div>
+        </div>
+        <div class="nav-tabs" role="tablist">
+          <button class="tab is-active" data-view="dashboard" role="tab" aria-selected="true">Dashboard</button>
+          <button class="tab" data-view="transactions" role="tab" aria-selected="false">Transactions</button>
+        </div>
+        <div class="nav-meta">
+          <span class="pill-text" id="rangeSummary">--</span>
+        </div>
+      </header>
+
+      <div class="layout">
+        <aside class="sidebar">
+          <div class="panel">
+            <div class="panel-title">Accounts</div>
+            <div class="account-list" id="accountList"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-title">Time range</div>
+            <div class="range-buttons" id="rangeButtons">
+              <button class="pill" data-range="7">7 days</button>
+              <button class="pill" data-range="30">30 days</button>
+              <button class="pill" data-range="all">All</button>
+            </div>
+            <button class="pill pill-wide" id="customRange">Customize</button>
+            <div class="range-info" id="rangeInfo">--</div>
+          </div>
+
+          <div class="panel panel-muted">
+            <div class="panel-title">Settings</div>
+            <div class="settings-row">
+              <span>Show animations</span>
+              <label class="switch">
+                <input type="checkbox" id="toggleMotion" checked />
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+        </aside>
+
+        <main class="main">
+          <section class="view view-active" id="dashboardView">
+            <div class="dashboard-grid">
+              <article class="card balance-card reveal">
+                <div class="card-header">
+                  <div>
+                    <div class="eyebrow">Balance overview</div>
+                    <h2 class="card-title" id="balanceTitle">--</h2>
+                  </div>
+                  <div class="delta" id="balanceDelta"></div>
+                </div>
+                <div class="balance-value" id="balanceValue">--</div>
+                <div class="balance-meta" id="balanceMeta">--</div>
+                <div class="account-breakdown" id="accountBreakdown"></div>
+              </article>
+
+              <article class="card cashflow-card reveal">
+                <div class="card-header">
+                  <div>
+                    <div class="eyebrow">Cash flow</div>
+                    <h2 class="card-title">Netflow</h2>
+                  </div>
+                </div>
+                <div class="cashflow-value" id="netflowValue">--</div>
+                <div class="metric-list">
+                  <div class="metric-row">
+                    <span>Inflow</span>
+                    <span class="metric-value" id="inflowValue">--</span>
+                    <span class="metric-ratio" id="inflowRatio">--</span>
+                  </div>
+                  <div class="metric-row">
+                    <span>Outflow</span>
+                    <span class="metric-value" id="outflowValue">--</span>
+                    <span class="metric-ratio" id="outflowRatio">--</span>
+                  </div>
+                  <div class="metric-row">
+                    <span>Net internal transfer</span>
+                    <span class="metric-value" id="transferValue">--</span>
+                    <span class="metric-ratio"></span>
+                  </div>
+                </div>
+              </article>
+
+              <article class="card heatmap-card reveal">
+                <div class="card-header">
+                  <div>
+                    <div class="eyebrow">Heatmap</div>
+                    <h2 class="card-title">Daily net inflow</h2>
+                  </div>
+                  <div class="legend" id="heatmapLegend">Low - High</div>
+                </div>
+                <div class="chart" id="heatmapChart"></div>
+              </article>
+
+              <article class="card monthly-card reveal">
+                <div class="card-header">
+                  <div>
+                    <div class="eyebrow">Monthly combo</div>
+                    <h2 class="card-title">Balance and cash flow</h2>
+                  </div>
+                </div>
+                <div class="chart" id="monthlyChart"></div>
+              </article>
+            </div>
+
+            <article class="card daily-card reveal">
+              <div class="card-header">
+                <div>
+                  <div class="eyebrow">Daily combo</div>
+                  <h2 class="card-title">Balance and inflow/outflow</h2>
+                </div>
+                <div class="chip-group">
+                  <span class="chip">Balance</span>
+                  <span class="chip">Inflow</span>
+                  <span class="chip">Outflow</span>
+                </div>
+              </div>
+              <div class="chart chart-tall" id="dailyChart"></div>
+            </article>
+
+            <div class="dashboard-grid bottom-grid">
+              <article class="card sankey-card reveal">
+                <div class="card-header">
+                  <div>
+                    <div class="eyebrow">Cash flow</div>
+                    <h2 class="card-title">Income to expense flow</h2>
+                  </div>
+                </div>
+                <div class="chart chart-tall" id="sankeyChart"></div>
+              </article>
+
+              <article class="card category-card reveal">
+                <div class="card-header">
+                  <div>
+                    <div class="eyebrow">Category mix</div>
+                    <h2 class="card-title">Proportion and top 5</h2>
+                  </div>
+                  <div class="toggle" role="group" aria-label="Category type">
+                    <button class="toggle-btn is-active" data-type="expense">Expense</button>
+                    <button class="toggle-btn" data-type="income">Income</button>
+                  </div>
+                </div>
+                <div class="donut-wrap">
+                  <div class="chart" id="donutChart"></div>
+                  <div class="donut-legend" id="donutLegend"></div>
+                </div>
+                <div class="top-list" id="topList"></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="view" id="transactionsView">
+            <div class="transactions-toolbar">
+              <div class="sort-control">
+                <label for="transactionSort">Sort by</label>
+                <select id="transactionSort">
+                  <option value="date">Date</option>
+                  <option value="amount">Amount</option>
+                </select>
+              </div>
+              <div class="filter-group" id="transactionFilters">
+                <button class="filter-chip is-active" data-filter="income">Income</button>
+                <button class="filter-chip is-active" data-filter="expense">Expense</button>
+                <button class="filter-chip is-active" data-filter="refund">Refund</button>
+                <button class="filter-chip is-active" data-filter="transfer">Transfer</button>
+              </div>
+            </div>
+            <div class="transactions-list" id="transactionsList"></div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <div class="modal" id="rangeModal" aria-hidden="true">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Custom range</h3>
+          <button class="icon-button" id="closeRangeModal" aria-label="Close">x</button>
+        </div>
+        <div class="modal-body">
+          <label class="field">
+            <span>Start date</span>
+            <input type="date" id="rangeStart" />
+          </label>
+          <label class="field">
+            <span>End date</span>
+            <input type="date" id="rangeEnd" />
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button class="pill" id="applyRange">Apply</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>
