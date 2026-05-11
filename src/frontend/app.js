@@ -787,18 +787,22 @@ function bindChartInteractions() {
     setCustomRange(date, date);
   });
 
-  state.charts.monthly.on("click", (params) => {
-    if (!params) return;
-    const month = getAxisCategoryFromClick(state.charts.monthly, params) || params.name || params.axisValue;
+  // Module D: zr click captures ALL clicks on the canvas (not just on bar/line elements)
+  state.charts.monthly.getZr().on("click", (event) => {
+    const point = [event.offsetX, event.offsetY];
+    if (!state.charts.monthly.containPixel("grid", point)) return;
+    const month = getCategoryFromZrClick(state.charts.monthly, point);
     if (!month) return;
     const range = getMonthRange(month);
     if (!range) return;
     setCustomRange(range.start, range.end);
   });
 
-  state.charts.daily.on("click", (params) => {
-    if (!params) return;
-    const date = getAxisCategoryFromClick(state.charts.daily, params) || params.name || params.axisValue;
+  // Module E: zr click captures ALL clicks on the canvas (not just on bar/line elements)
+  state.charts.daily.getZr().on("click", (event) => {
+    const point = [event.offsetX, event.offsetY];
+    if (!state.charts.daily.containPixel("grid", point)) return;
+    const date = getCategoryFromZrClick(state.charts.daily, point);
     if (!date) return;
     openDayDetail(date);
   });
@@ -979,24 +983,16 @@ function getMonthRange(monthLabel) {
   return { start: toIsoDate(start), end: toIsoDate(end) };
 }
 
-function getAxisCategoryFromClick(chart, params) {
-  if (!chart || !params || !params.event) return null;
-  const { offsetX, offsetY } = params.event;
-  if (offsetX === undefined || offsetY === undefined) return null;
-
-  const rawValue = chart.convertFromPixel({ xAxisIndex: 0 }, [offsetX, offsetY]);
+function getCategoryFromZrClick(chart, pixelPoint) {
+  if (!chart || !pixelPoint) return null;
+  // convertFromPixel returns [xValue, yValue]; xValue is the category index for category axes
+  const dataPoint = chart.convertFromPixel({ gridIndex: 0 }, pixelPoint);
+  if (!dataPoint) return null;
+  const index = Math.round(dataPoint[0]);
   const option = chart.getOption();
   const categories = (option.xAxis && option.xAxis[0] && option.xAxis[0].data) || [];
-
-  if (typeof rawValue === "number") {
-    const index = Math.round(rawValue);
-    if (index < 0 || index >= categories.length) return null;
-    return categories[index];
-  }
-  if (typeof rawValue === "string") {
-    return rawValue;
-  }
-  return null;
+  if (index < 0 || index >= categories.length) return null;
+  return categories[index];
 }
 
 function toIsoDate(date) {

@@ -483,6 +483,11 @@ input {
   height: 160px;
 }
 
+.monthly-card .chart,
+.daily-card .chart {
+  cursor: pointer;
+}
+
 .legend {
   font-size: 12px;
   color: var(--muted);
