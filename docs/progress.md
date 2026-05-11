@@ -47,6 +47,10 @@
   - Transactions list displays signed amounts based on `cashflow_direction`.
     - Added balance consistency checks by PDF in `transactions_check.py` with auto-removal of invalid PDF records.
     - Parser runs balance check before refund/transfer detection and reparses failing PDFs up to 3 times.
+  - Frontend: added chart click interactions for C/D (auto custom range) and modal detail cards for E/F/G.
+  - Frontend: detail cards support sorting by transaction ID or amount; daily detail supports type filtering.
+  - Docs: updated frontend interaction specs for modules C-G.
+  - Frontend: monthly/daily charts accept axisPointer line clicks for drill-down actions.
 
 ## Plan
 

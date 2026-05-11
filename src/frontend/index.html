@@ -213,6 +213,44 @@
       </div>
     </div>
 
+    <div class="modal" id="detailModal" aria-hidden="true">
+      <div class="modal-card modal-card-wide">
+        <div class="modal-header">
+          <div>
+            <h3 id="detailTitle">Details</h3>
+            <div class="detail-subtitle" id="detailSubtitle">--</div>
+          </div>
+          <button class="icon-button" id="detailClose" aria-label="Close">x</button>
+        </div>
+        <div class="detail-metrics" id="detailMetrics"></div>
+        <div class="detail-toolbar">
+          <div class="sort-control">
+            <label for="detailSort">Sort by</label>
+            <select id="detailSort">
+              <option value="id">Transaction ID</option>
+              <option value="amount">Amount</option>
+            </select>
+          </div>
+          <div class="filter-group" id="detailFilters">
+            <button class="filter-chip is-active" data-filter="income">Income</button>
+            <button class="filter-chip is-active" data-filter="expense">Expense</button>
+            <button class="filter-chip is-active" data-filter="refund">Refund</button>
+            <button class="filter-chip is-active" data-filter="transfer">Transfer</button>
+          </div>
+        </div>
+        <div class="detail-list">
+          <div class="detail-header">
+            <span>Description</span>
+            <span>Category</span>
+            <span>Type</span>
+            <span>Amount</span>
+            <span>ID</span>
+          </div>
+          <div class="detail-rows" id="detailList"></div>
+        </div>
+      </div>
+    </div>
+
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </body>
 </html>

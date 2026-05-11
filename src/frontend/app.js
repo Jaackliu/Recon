@@ -21,6 +21,19 @@ const state = {
     refund: true,
     transfer: true
   },
+  detail: {
+    mode: null,
+    date: "",
+    category: "",
+    categoryType: "",
+    sort: "id",
+    filters: {
+      income: true,
+      expense: true,
+      refund: true,
+      transfer: true
+    }
+  },
   data: {
     accounts: [],
     dailySeries: {},
@@ -60,6 +73,14 @@ const dom = {
   applyRange: document.getElementById("applyRange"),
   closeRangeModal: document.getElementById("closeRangeModal"),
   customRange: document.getElementById("customRange"),
+  detailModal: document.getElementById("detailModal"),
+  detailTitle: document.getElementById("detailTitle"),
+  detailSubtitle: document.getElementById("detailSubtitle"),
+  detailMetrics: document.getElementById("detailMetrics"),
+  detailSort: document.getElementById("detailSort"),
+  detailFilters: document.getElementById("detailFilters"),
+  detailList: document.getElementById("detailList"),
+  detailClose: document.getElementById("detailClose"),
   toast: document.getElementById("toast"),
   settingsBtn: document.getElementById("settingsBtn")
 };
@@ -163,18 +184,35 @@ function bindEvents() {
       showToast("Select a valid date range.");
       return;
     }
-    state.customRange.start = start;
-    state.customRange.end = end;
-    state.rangeMode = "custom";
+    setCustomRange(start, end);
     closeRangeModal();
-    setActiveRangeButton();
-    updateAll();
   });
 
   dom.closeRangeModal.addEventListener("click", closeRangeModal);
   dom.rangeModal.addEventListener("click", (event) => {
     if (event.target === dom.rangeModal) {
       closeRangeModal();
+    }
+  });
+
+  dom.detailSort.addEventListener("change", () => {
+    state.detail.sort = dom.detailSort.value;
+    renderDetailList();
+  });
+
+  dom.detailFilters.addEventListener("click", (event) => {
+    const button = event.target.closest(".filter-chip");
+    if (!button) return;
+    const filter = button.dataset.filter;
+    state.detail.filters[filter] = !state.detail.filters[filter];
+    button.classList.toggle("is-active", state.detail.filters[filter]);
+    renderDetailList();
+  });
+
+  dom.detailClose.addEventListener("click", closeDetailModal);
+  dom.detailModal.addEventListener("click", (event) => {
+    if (event.target === dom.detailModal) {
+      closeDetailModal();
     }
   });
 
@@ -233,6 +271,7 @@ function setActiveRangeButton() {
   document.querySelectorAll(".range-buttons .pill").forEach((pill) => {
     pill.classList.toggle("is-active", pill.dataset.range === state.rangeMode);
   });
+  dom.customRange.classList.toggle("is-active", state.rangeMode === "custom");
 }
 
 function setActiveCategoryToggle() {
@@ -421,6 +460,10 @@ function updateMonthlyChart() {
   const option = {
     tooltip: {
       trigger: "axis",
+      axisPointer: {
+        type: "line",
+        snap: true
+      },
       formatter: (params) => {
         let result = params[0].axisValue + "<br/>";
         params.forEach((p) => {
@@ -499,6 +542,10 @@ function updateDailyChart(slice) {
   const option = {
     tooltip: {
       trigger: "axis",
+      axisPointer: {
+        type: "line",
+        snap: true
+      },
       formatter: (params) => {
         let result = params[0].axisValue + "<br/>";
         params.forEach((p) => {
@@ -730,6 +777,233 @@ function initCharts() {
   state.charts.daily = echarts.init(document.getElementById("dailyChart"));
   state.charts.sankey = echarts.init(document.getElementById("sankeyChart"));
   state.charts.donut = echarts.init(document.getElementById("donutChart"));
+  bindChartInteractions();
+}
+
+function bindChartInteractions() {
+  state.charts.heatmap.on("click", (params) => {
+    if (!params || !params.data || !params.data[0]) return;
+    const date = params.data[0];
+    setCustomRange(date, date);
+  });
+
+  state.charts.monthly.on("click", (params) => {
+    if (!params) return;
+    const month = getAxisCategoryFromClick(state.charts.monthly, params) || params.name || params.axisValue;
+    if (!month) return;
+    const range = getMonthRange(month);
+    if (!range) return;
+    setCustomRange(range.start, range.end);
+  });
+
+  state.charts.daily.on("click", (params) => {
+    if (!params) return;
+    const date = getAxisCategoryFromClick(state.charts.daily, params) || params.name || params.axisValue;
+    if (!date) return;
+    openDayDetail(date);
+  });
+
+  state.charts.sankey.on("click", (params) => {
+    if (!params || params.dataType !== "node") return;
+    const name = params.name || "";
+    if (name.startsWith("收入: ")) {
+      openCategoryDetail(name.replace("收入: ", ""), "income");
+    }
+    if (name.startsWith("支出: ")) {
+      openCategoryDetail(name.replace("支出: ", ""), "expense");
+    }
+  });
+
+  state.charts.donut.on("click", (params) => {
+    if (!params || !params.name) return;
+    openCategoryDetail(params.name, state.categoryType);
+  });
+}
+
+function setCustomRange(startDate, endDate) {
+  const series = getSeriesForAccount(state.account);
+  if (!series || series.length === 0) return;
+  const minDate = series[0].date;
+  const maxDate = series[series.length - 1].date;
+  const clampedStart = clampDate(startDate, minDate, maxDate);
+  const clampedEnd = clampDate(endDate, minDate, maxDate);
+  const finalStart = clampedStart <= clampedEnd ? clampedStart : clampedEnd;
+  const finalEnd = clampedStart <= clampedEnd ? clampedEnd : clampedStart;
+
+  state.customRange.start = finalStart;
+  state.customRange.end = finalEnd;
+  state.rangeMode = "custom";
+  setActiveRangeButton();
+  updateAll();
+}
+
+function openDayDetail(date) {
+  const series = getSeriesForAccount(state.account);
+  if (!series) return;
+  const entry = series.find((item) => item.date === date);
+  if (!entry) return;
+
+  state.detail.mode = "day";
+  state.detail.date = date;
+  state.detail.category = "";
+  state.detail.categoryType = "";
+
+  const netflow = round2(entry.all_inflow + entry.all_outflow);
+  dom.detailTitle.textContent = "Daily details";
+  dom.detailSubtitle.textContent = `${date} · ${getAccountLabel(state.account)}`;
+  renderDetailMetrics([
+    { label: "Date", value: date },
+    { label: "End balance", value: formatMoney(entry.end_balance) },
+    { label: "Netflow", value: formatMoney(netflow) },
+    { label: "Inflow", value: formatMoney(entry.all_inflow) },
+    { label: "Outflow", value: formatMoney(entry.all_outflow) }
+  ]);
+  dom.detailFilters.style.display = "flex";
+  syncDetailFilters();
+  dom.detailSort.value = state.detail.sort;
+  renderDetailList();
+  openDetailModal();
+}
+
+function openCategoryDetail(category, categoryType) {
+  const series = getSeriesForAccount(state.account);
+  if (!series) return;
+
+  state.detail.mode = "category";
+  state.detail.category = category;
+  state.detail.categoryType = categoryType;
+  state.detail.date = "";
+
+  const range = getRange(series);
+  const transactions = getDetailTransactions();
+  const total = sumBy(transactions, "amount");
+  const typeLabel = formatType(categoryType);
+
+  dom.detailTitle.textContent = `${typeLabel} category`;
+  dom.detailSubtitle.textContent = `${category} · ${range.startDate} to ${range.endDate}`;
+  renderDetailMetrics([
+    { label: "Category", value: category },
+    { label: "Range", value: `${range.startDate} to ${range.endDate}` },
+    { label: "Transactions", value: String(transactions.length) },
+    { label: "Total amount", value: formatMoney(total) }
+  ]);
+  dom.detailFilters.style.display = "none";
+  dom.detailSort.value = state.detail.sort;
+  renderDetailList();
+  openDetailModal();
+}
+
+function renderDetailMetrics(metrics) {
+  dom.detailMetrics.innerHTML = "";
+  metrics.forEach((metric) => {
+    const item = document.createElement("div");
+    item.className = "detail-metric";
+    item.innerHTML = `<span>${escapeHtml(metric.label)}</span><strong>${escapeHtml(metric.value)}</strong>`;
+    dom.detailMetrics.appendChild(item);
+  });
+}
+
+function renderDetailList() {
+  const transactions = getDetailTransactions();
+  dom.detailList.innerHTML = "";
+
+  if (transactions.length === 0) {
+    dom.detailList.innerHTML = `<div class="detail-empty">No transactions found.</div>`;
+    return;
+  }
+
+  transactions.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "detail-row";
+    row.innerHTML = `
+      <div><strong>${escapeHtml(item.description)}</strong></div>
+      <div>${escapeHtml(item.category)}</div>
+      <div><span class="tag ${item.type}">${formatType(item.type)}</span></div>
+      <div class="detail-amount">${formatSignedMoney(item.amount, item.cashflow_direction)}</div>
+      <div class="detail-id">${escapeHtml(item.id)}</div>
+    `;
+    dom.detailList.appendChild(row);
+  });
+}
+
+function getDetailTransactions() {
+  const transactions = getTransactionsForAccount(state.account);
+  const series = getSeriesForAccount(state.account);
+  if (!series) return [];
+
+  let filtered = transactions;
+  if (state.detail.mode === "day") {
+    filtered = filtered.filter((item) => item.date === state.detail.date);
+    filtered = filtered.filter((item) => state.detail.filters[item.type]);
+  } else if (state.detail.mode === "category") {
+    const range = getRange(series);
+    filtered = filtered
+      .filter((item) => item.category === state.detail.category)
+      .filter((item) => item.date >= range.startDate && item.date <= range.endDate);
+  }
+
+  if (state.detail.sort === "amount") {
+    filtered.sort((a, b) => b.amount - a.amount);
+  } else {
+    filtered.sort((a, b) => a.id.localeCompare(b.id));
+  }
+
+  return filtered;
+}
+
+function syncDetailFilters() {
+  dom.detailFilters.querySelectorAll(".filter-chip").forEach((chip) => {
+    const filter = chip.dataset.filter;
+    chip.classList.toggle("is-active", state.detail.filters[filter]);
+  });
+}
+
+function openDetailModal() {
+  dom.detailModal.classList.add("is-open");
+  dom.detailModal.setAttribute("aria-hidden", "false");
+}
+
+function closeDetailModal() {
+  dom.detailModal.classList.remove("is-open");
+  dom.detailModal.setAttribute("aria-hidden", "true");
+}
+
+function getMonthRange(monthLabel) {
+  const parts = monthLabel.split("-");
+  if (parts.length !== 2) return null;
+  const year = Number(parts[0]);
+  const month = Number(parts[1]);
+  if (!year || !month) return null;
+  const start = new Date(year, month - 1, 1);
+  const end = new Date(year, month, 0);
+  return { start: toIsoDate(start), end: toIsoDate(end) };
+}
+
+function getAxisCategoryFromClick(chart, params) {
+  if (!chart || !params || !params.event) return null;
+  const { offsetX, offsetY } = params.event;
+  if (offsetX === undefined || offsetY === undefined) return null;
+
+  const rawValue = chart.convertFromPixel({ xAxisIndex: 0 }, [offsetX, offsetY]);
+  const option = chart.getOption();
+  const categories = (option.xAxis && option.xAxis[0] && option.xAxis[0].data) || [];
+
+  if (typeof rawValue === "number") {
+    const index = Math.round(rawValue);
+    if (index < 0 || index >= categories.length) return null;
+    return categories[index];
+  }
+  if (typeof rawValue === "string") {
+    return rawValue;
+  }
+  return null;
+}
+
+function toIsoDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function getSeriesForAccount(code) {
