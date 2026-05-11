@@ -11,9 +11,13 @@ from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+import sys
+sys.dont_write_bytecode = True
+
 import fitz
 from anthropic import Anthropic
-import transactions_check
+import check_transactions
+import detect_reclassify
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -370,114 +374,6 @@ def apply_dedup(
     return kept
 
 
-def detect_refunds(transactions: List[Dict[str, Any]], logger: logging.Logger) -> None:
-    by_account: Dict[str, List[Dict[str, Any]]] = {}
-    for tx in transactions:
-        by_account.setdefault(tx["account_code"], []).append(tx)
-
-    for account_code, txns in by_account.items():
-        txns.sort(key=lambda t: (t["date"], t["transaction_id"]))
-        consumed: Set[str] = set()
-        for i, tx in enumerate(txns):
-            if tx["transaction_id"] in consumed:
-                continue
-            if tx["type_code"] != 2:
-                continue
-            amount = tx["amount"]
-            tx_date = datetime.strptime(tx["date"], "%Y-%m-%d").date()
-            is_integer_amount = abs(amount - round(amount)) < 0.005
-            if is_integer_amount and amount <= 5:
-                continue
-            window_days = 30 if is_integer_amount else 60
-            for j in range(i + 1, len(txns)):
-                other = txns[j]
-                if other["transaction_id"] in consumed:
-                    continue
-                if other["type_code"] != 1:
-                    continue
-                other_date = datetime.strptime(other["date"], "%Y-%m-%d").date()
-                delta = (other_date - tx_date).days
-                if delta < 0 or delta > window_days:
-                    break
-                if abs(other["amount"] - amount) < 0.005:
-                    tx["type_code"] = 3
-                    other["type_code"] = 3
-                    consumed.add(tx["transaction_id"])
-                    consumed.add(other["transaction_id"])
-                    logger.info(
-                        "Refund detected: %s (%.2f) <-> %s (%.2f) on %s~%s",
-                        tx["transaction_id"], amount,
-                        other["transaction_id"], other["amount"],
-                        tx["date"], other["date"],
-                    )
-                    break
-
-
-def detect_transfers(transactions: List[Dict[str, Any]], logger: logging.Logger) -> List[Dict[str, Any]]:
-    expenses: List[Dict[str, Any]] = []
-    incomes: List[Dict[str, Any]] = []
-    for tx in transactions:
-        if tx["type_code"] == 2:
-            expenses.append(tx)
-        elif tx["type_code"] == 1:
-            incomes.append(tx)
-
-    expenses.sort(key=lambda t: (t["date"], t["transaction_id"]))
-    incomes.sort(key=lambda t: (t["date"], t["transaction_id"]))
-
-    consumed: Set[str] = set()
-    fee_txns: List[Dict[str, Any]] = []
-
-    for exp in expenses:
-        if exp["transaction_id"] in consumed:
-            continue
-        exp_date = datetime.strptime(exp["date"], "%Y-%m-%d").date()
-        exp_account = exp["account_code"]
-        exp_amount = exp["amount"]
-
-        best_match = None
-        for inc in incomes:
-            if inc["transaction_id"] in consumed:
-                continue
-            if inc["account_code"] == exp_account:
-                continue
-            inc_date = datetime.strptime(inc["date"], "%Y-%m-%d").date()
-            delta = (inc_date - exp_date).days
-            if delta < 0 or delta > 3:
-                continue
-            if exp_amount * 0.97 <= inc["amount"] <= exp_amount:
-                best_match = inc
-                break
-
-        if best_match:
-            exp["type_code"] = 4
-            best_match["type_code"] = 4
-            consumed.add(exp["transaction_id"])
-            consumed.add(best_match["transaction_id"])
-            logger.info(
-                "Transfer detected: %s (%.2f, acct %s) <-> %s (%.2f, acct %s)",
-                exp["transaction_id"], exp_amount, exp_account,
-                best_match["transaction_id"], best_match["amount"], best_match["account_code"],
-            )
-            fee = round(exp_amount - best_match["amount"], 2)
-            if fee > 0.005:
-                fee_txns.append({
-                    "account_code": exp_account,
-                    "date": exp["date"],
-                    "type_code": 2,
-                    "cashflow_direction": 2,
-                    "currency": "CNY",
-                    "amount": fee,
-                    "balance": 0,
-                    "category": "其他",
-                    "description": "转账手续费",
-                    "raw_text": f"transfer fee for {exp['transaction_id']}",
-                })
-                logger.info("Fee transaction generated: %.2f for %s", fee, exp_account)
-
-    return fee_txns
-
-
 # ---------------------------------------------------------------------------
 # Validation
 # ---------------------------------------------------------------------------
@@ -579,7 +475,7 @@ def run_balance_check_and_reparse(
     logger: logging.Logger,
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     for attempt in range(1, BALANCE_CHECK_MAX_RETRIES + 1):
-        errors_by_hash = transactions_check.check_transactions_by_pdf(
+        errors_by_hash = check_transactions.check_transactions_by_pdf(
             transactions,
             parsed_entries,
             logger,
@@ -605,7 +501,7 @@ def run_balance_check_and_reparse(
                 BALANCE_CHECK_MAX_RETRIES,
                 len(failed_hashes),
             )
-            transactions, parsed_entries = transactions_check.remove_pdf_records(
+            transactions, parsed_entries = check_transactions.remove_pdf_records(
                 transactions,
                 parsed_entries,
                 failed_hashes,
@@ -613,7 +509,7 @@ def run_balance_check_and_reparse(
             )
             return transactions, parsed_entries
 
-        transactions, parsed_entries = transactions_check.remove_pdf_records(
+        transactions, parsed_entries = check_transactions.remove_pdf_records(
             transactions,
             parsed_entries,
             failed_hashes,
@@ -748,7 +644,6 @@ def main() -> None:
     all_new_txns = apply_dedup(all_new_txns, transactions, logger)
     if not all_new_txns:
         logger.info("All new transactions were duplicates. Nothing to add.")
-        # Still update parsed.json
         parsed_entries.extend(new_parsed_entries)
         write_json(PARSED_PATH, parsed_entries)
         return
@@ -758,7 +653,7 @@ def main() -> None:
     parsed_entries.extend(new_parsed_entries)
     logger.debug("Total transactions after merge: %d", len(transactions))
 
-    # Balance consistency check before refunds/transfers
+    # Balance consistency check on full dataset
     transactions, parsed_entries = run_balance_check_and_reparse(
         transactions,
         parsed_entries,
@@ -770,21 +665,11 @@ def main() -> None:
     )
 
     # Refund detection on full dataset
-    detect_refunds(transactions, logger)
+    detect_reclassify.detect_refunds(transactions, logger)
 
     # Transfer detection on full dataset
-    fee_txns = detect_transfers(transactions, logger)
+    fee_txns = detect_reclassify.detect_transfers(transactions, logger, processed_at=processed_at)
     if fee_txns:
-        seq_map = build_seq_map(transactions)
-        # Assign IDs to fee transactions
-        for fee in fee_txns:
-            key = (fee["account_code"], fee["date"])
-            seq = seq_map.get(key, 0) + 1
-            seq_map[key] = seq
-            date_compact = fee["date"].replace("-", "")
-            fee["transaction_id"] = f"TX-{fee['account_code']}-{date_compact}-{seq:03d}"
-            fee["processed_at"] = processed_at
-            fee["source_hash"] = ""
         transactions.extend(fee_txns)
         logger.debug("Added %d fee transactions", len(fee_txns))
 

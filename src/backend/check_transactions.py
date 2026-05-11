@@ -30,10 +30,10 @@ def write_json(path: Path, data: Any) -> None:
 
 def setup_logger() -> logging.Logger:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
-    logger = logging.getLogger("transactions_check")
+    logger = logging.getLogger("check_transactions")
     logger.setLevel(logging.INFO)
     if not logger.handlers:
-        handler = logging.FileHandler(LOG_DIR / "transactions_check.log", encoding="utf-8")
+        handler = logging.FileHandler(LOG_DIR / "check_transactions.log", encoding="utf-8")
         formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
         handler.setFormatter(formatter)
         logger.addHandler(handler)
