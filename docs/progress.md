@@ -45,6 +45,8 @@
   - Parser now writes `cashflow_direction` from initial `type_code`; refund/transfer detection only mutates `type_code`.
   - Processor cashflow aggregation now uses `cashflow_direction` for all inflow/outflow calculations.
   - Transactions list displays signed amounts based on `cashflow_direction`.
+    - Added balance consistency checks by PDF in `transactions_check.py` with auto-removal of invalid PDF records.
+    - Parser runs balance check before refund/transfer detection and reparses failing PDFs up to 3 times.
 
 ## Plan
 

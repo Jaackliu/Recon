@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 import fitz
 from anthropic import Anthropic
+import transactions_check
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -24,6 +25,7 @@ MAX_RETRIES = 3
 RETRY_DELAY = 5
 IMAGE_GROUP_SIZE = 2
 MAX_WORKERS = 5
+BALANCE_CHECK_MAX_RETRIES = 3
 
 TZ_CST = timezone(timedelta(hours=8))
 
@@ -517,6 +519,144 @@ def validate_single_account(raw_txns: List[Dict[str, Any]], logger: logging.Logg
     return True
 
 
+def parse_pdf(
+    pdf_path: Path,
+    file_hash: str,
+    system_prompt: str,
+    client: Anthropic,
+    api_key: str,
+    seq_map: Dict[Tuple[str, str], int],
+    logger: logging.Logger,
+    processed_at: str,
+) -> Tuple[List[Dict[str, Any]], Optional[Dict[str, Any]]]:
+    try:
+        images = render_pdf_to_images(pdf_path)
+        logger.info("Processing %s (%d pages, hash: %s...)", pdf_path.name, len(images), file_hash[:16])
+    except Exception as exc:
+        logger.error("Failed to render PDF %s: %s", pdf_path.name, exc)
+        return [], None
+
+    response_text = call_ai_grouped(client, system_prompt, images, logger, api_key)
+    if not response_text:
+        logger.error("No response from AI for %s", pdf_path.name)
+        return [], None
+
+    raw_txns = parse_ai_response(response_text)
+    if not raw_txns:
+        logger.error("Failed to parse AI response for %s. Response (truncated): %s",
+                     pdf_path.name, response_text[:500])
+        return [], None
+    logger.info("Extracted %d raw transactions from %s", len(raw_txns), pdf_path.name)
+
+    raw_txns = validate_transactions(raw_txns, logger)
+    if not raw_txns:
+        logger.error("No valid transactions after validation for %s", pdf_path.name)
+        return [], None
+
+    if not validate_single_account(raw_txns, logger):
+        logger.error("Skipping %s due to multi-account violation", pdf_path.name)
+        return [], None
+
+    account_code = str(raw_txns[0].get("account_code", "")).strip()
+    new_txns = assign_transaction_ids(raw_txns, seq_map, file_hash, processed_at)
+    parsed_entry = {
+        "file_hash": file_hash,
+        "file_name": pdf_path.name,
+        "processed_at": processed_at,
+        "account_code": account_code,
+    }
+    logger.debug("Assigned %d transaction IDs for %s (account: %s)", len(new_txns), pdf_path.name, account_code)
+    return new_txns, parsed_entry
+
+
+def run_balance_check_and_reparse(
+    transactions: List[Dict[str, Any]],
+    parsed_entries: List[Dict[str, Any]],
+    pdf_hash_map: Dict[str, Path],
+    system_prompt: str,
+    client: Anthropic,
+    api_key: str,
+    logger: logging.Logger,
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    for attempt in range(1, BALANCE_CHECK_MAX_RETRIES + 1):
+        errors_by_hash = transactions_check.check_transactions_by_pdf(
+            transactions,
+            parsed_entries,
+            logger,
+        )
+        if not errors_by_hash:
+            if attempt == 1:
+                logger.info("Balance check: all PDFs ok")
+            else:
+                logger.info("Balance check passed after %d attempts", attempt)
+            return transactions, parsed_entries
+
+        failed_hashes = sorted(errors_by_hash.keys())
+        logger.warning(
+            "Balance check found %d PDFs with mismatches (attempt %d/%d)",
+            len(failed_hashes),
+            attempt,
+            BALANCE_CHECK_MAX_RETRIES,
+        )
+
+        if attempt >= BALANCE_CHECK_MAX_RETRIES:
+            logger.error(
+                "Balance check failed after %d attempts; removing %d PDFs",
+                BALANCE_CHECK_MAX_RETRIES,
+                len(failed_hashes),
+            )
+            transactions, parsed_entries = transactions_check.remove_pdf_records(
+                transactions,
+                parsed_entries,
+                failed_hashes,
+                logger,
+            )
+            return transactions, parsed_entries
+
+        transactions, parsed_entries = transactions_check.remove_pdf_records(
+            transactions,
+            parsed_entries,
+            failed_hashes,
+            logger,
+        )
+
+        reparsed_txns: List[Dict[str, Any]] = []
+        reparsed_entries: List[Dict[str, Any]] = []
+        seq_map = build_seq_map(transactions)
+        processed_at = datetime.now(TZ_CST).isoformat()
+
+        for file_hash in failed_hashes:
+            pdf_path = pdf_hash_map.get(file_hash)
+            if not pdf_path:
+                logger.error("Balance check: missing PDF file for hash %s", file_hash)
+                continue
+            new_txns, parsed_entry = parse_pdf(
+                pdf_path,
+                file_hash,
+                system_prompt,
+                client,
+                api_key,
+                seq_map,
+                logger,
+                processed_at,
+            )
+            if not new_txns or not parsed_entry:
+                logger.error("Balance check: reparse failed for %s", pdf_path.name)
+                continue
+            reparsed_txns.extend(new_txns)
+            reparsed_entries.append(parsed_entry)
+
+        if reparsed_txns:
+            reparsed_txns = apply_dedup(reparsed_txns, transactions, logger)
+            if reparsed_txns:
+                transactions.extend(reparsed_txns)
+                transactions.sort(key=lambda t: (t["date"], t["transaction_id"]))
+        if reparsed_entries:
+            parsed_entries.extend(reparsed_entries)
+
+    return transactions, parsed_entries
+
+
 # ---------------------------------------------------------------------------
 # Main Pipeline
 # ---------------------------------------------------------------------------
@@ -552,11 +692,13 @@ def main() -> None:
         return
 
     # Filter out already parsed
-    unprocessed: List[Path] = []
+    pdf_hash_map: Dict[str, Path] = {}
+    unprocessed: List[Tuple[Path, str]] = []
     for pdf_path in pdf_files:
         file_hash = compute_file_hash(pdf_path)
+        pdf_hash_map[file_hash] = pdf_path
         if file_hash not in parsed_hashes:
-            unprocessed.append(pdf_path)
+            unprocessed.append((pdf_path, file_hash))
 
     if not unprocessed:
         logger.info("All %d PDFs already parsed. Nothing to do.", len(pdf_files))
@@ -582,52 +724,21 @@ def main() -> None:
     new_parsed_entries: List[Dict[str, Any]] = []
 
     # Process each PDF
-    for pdf_path in unprocessed:
-        file_hash = compute_file_hash(pdf_path)
-
-        # Render PDF to images
-        try:
-            images = render_pdf_to_images(pdf_path)
-            logger.info("Processing %s (%d pages, hash: %s...)", pdf_path.name, len(images), file_hash[:16])
-        except Exception as exc:
-            logger.error("Failed to render PDF %s: %s", pdf_path.name, exc)
+    for pdf_path, file_hash in unprocessed:
+        new_txns, parsed_entry = parse_pdf(
+            pdf_path,
+            file_hash,
+            system_prompt,
+            client,
+            api_key,
+            seq_map,
+            logger,
+            processed_at,
+        )
+        if not new_txns or not parsed_entry:
             continue
-
-        # Call AI API (split into groups if > IMAGE_GROUP_SIZE pages)
-        response_text = call_ai_grouped(client, system_prompt, images, logger, api_key)
-        if not response_text:
-            logger.error("No response from AI for %s", pdf_path.name)
-            continue
-
-        # Parse response
-        raw_txns = parse_ai_response(response_text)
-        if not raw_txns:
-            logger.error("Failed to parse AI response for %s. Response (truncated): %s",
-                         pdf_path.name, response_text[:500])
-            continue
-        logger.info("Extracted %d raw transactions from %s", len(raw_txns), pdf_path.name)
-
-        # Validate
-        raw_txns = validate_transactions(raw_txns, logger)
-        if not raw_txns:
-            logger.error("No valid transactions after validation for %s", pdf_path.name)
-            continue
-
-        if not validate_single_account(raw_txns, logger):
-            logger.error("Skipping %s due to multi-account violation", pdf_path.name)
-            continue
-
-        # Assign IDs
-        account_code = str(raw_txns[0].get("account_code", "")).strip()
-        new_txns = assign_transaction_ids(raw_txns, seq_map, file_hash, processed_at)
         all_new_txns.extend(new_txns)
-        new_parsed_entries.append({
-            "file_hash": file_hash,
-            "file_name": pdf_path.name,
-            "processed_at": processed_at,
-            "account_code": account_code,
-        })
-        logger.debug("Assigned %d transaction IDs for %s (account: %s)", len(new_txns), pdf_path.name, account_code)
+        new_parsed_entries.append(parsed_entry)
 
     if not all_new_txns:
         logger.info("No new transactions extracted from any PDF.")
@@ -644,7 +755,19 @@ def main() -> None:
 
     # Merge
     transactions.extend(all_new_txns)
+    parsed_entries.extend(new_parsed_entries)
     logger.debug("Total transactions after merge: %d", len(transactions))
+
+    # Balance consistency check before refunds/transfers
+    transactions, parsed_entries = run_balance_check_and_reparse(
+        transactions,
+        parsed_entries,
+        pdf_hash_map,
+        system_prompt,
+        client,
+        api_key,
+        logger,
+    )
 
     # Refund detection on full dataset
     detect_refunds(transactions, logger)
@@ -652,6 +775,7 @@ def main() -> None:
     # Transfer detection on full dataset
     fee_txns = detect_transfers(transactions, logger)
     if fee_txns:
+        seq_map = build_seq_map(transactions)
         # Assign IDs to fee transactions
         for fee in fee_txns:
             key = (fee["account_code"], fee["date"])
@@ -669,8 +793,6 @@ def main() -> None:
 
     # Write outputs
     write_json(TRANSACTIONS_PATH, transactions)
-
-    parsed_entries.extend(new_parsed_entries)
     write_json(PARSED_PATH, parsed_entries)
 
     logger.info("Done: +%d new txns from %d PDFs, total %d transactions",
