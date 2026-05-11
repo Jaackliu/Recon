@@ -16,8 +16,6 @@ TYPE_LABELS = {
 }
 
 FILTERED_TYPE_CODES = {1, 2}
-INCOME_TYPE_CODES = {1, 3}
-OUTFLOW_TYPE_CODES = {2}
 INTERNAL_TRANSFER_CODE = 4
 
 
@@ -74,32 +72,21 @@ def setup_logger(log_path: Path) -> logging.Logger:
 
 def infer_signed_amount(
     tx: Dict[str, Any],
-    last_balance: Optional[float],
-    account_code: str,
     logger: logging.Logger,
 ) -> float:
     amount = float(tx["amount"])
-    type_code = int(tx["type_code"])
+    direction = int(tx["cashflow_direction"])
 
-    if type_code in INCOME_TYPE_CODES:
+    if direction == 1:
         return amount
-    if type_code in OUTFLOW_TYPE_CODES:
-        return -amount
-    if type_code == INTERNAL_TRANSFER_CODE:
-        if last_balance is not None:
-            delta = float(tx["balance"]) - float(last_balance)
-            if abs(delta) < 0.01:
-                logger.warning(
-                    "Internal transfer with zero delta: account=%s tx=%s", account_code, tx["transaction_id"]
-                )
-                return -amount
-            return amount if delta > 0 else -amount
-        logger.warning(
-            "Internal transfer without prior balance: account=%s tx=%s", account_code, tx["transaction_id"]
-        )
+    if direction == 2:
         return -amount
 
-    logger.warning("Unknown type_code: account=%s tx=%s", account_code, tx["transaction_id"])
+    logger.warning(
+        "Unknown cashflow_direction: account=%s tx=%s",
+        tx.get("account_code", ""),
+        tx.get("transaction_id", ""),
+    )
     return -amount
 
 
@@ -159,12 +146,12 @@ def build_daily_series(
 
         if day_txs:
             if start_balance is None:
-                signed_first = infer_signed_amount(day_txs[0], None, account_code, logger)
+                signed_first = infer_signed_amount(day_txs[0], logger)
                 start_balance = float(day_txs[0]["balance"]) - signed_first
             last_balance = start_balance
 
             for tx in day_txs:
-                signed = infer_signed_amount(tx, last_balance, account_code, logger)
+                signed = infer_signed_amount(tx, logger)
                 if signed >= 0:
                     all_inflow += signed
                 else:
@@ -349,6 +336,7 @@ def serialize_transaction(tx: Dict[str, Any]) -> Dict[str, Any]:
         "is_filtered": type_code in FILTERED_TYPE_CODES,
         "category": tx["category"],
         "amount": round_money(float(tx["amount"])),
+        "cashflow_direction": int(tx["cashflow_direction"]),
         "description": tx["description"],
     }
 

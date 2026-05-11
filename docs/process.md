@@ -23,8 +23,8 @@
 
 ### 3. 双轨计算 (Dual-Track Calculation)
 为了满足前端不同面板对“交易类型”的不同过滤要求（Cash Flow 包含所有，图表排除 3/4），在遍历计算每日数据时，必须维护两套指标：
-*   **全量指标 (All)**：累加所有 `type_code`。用于“B. 现金流”。
-*   **净指标 (Filtered)**：严格排除 `type_code: 3` (撤销/报销) 和 `4` (内部转账)。用于“C~G 的所有图表”。
+*   **全量指标 (All)**：累加所有 `type_code`，流入/流出方向统一由 `cashflow_direction` 决定。用于“B. 现金流”以及所有现金流类图表。
+*   **净指标 (Filtered)**：严格排除 `type_code: 3` (撤销/报销) 和 `4` (内部转账)，但流入/流出方向仍以 `cashflow_direction` 为准。用于“F/G 分类类图表”。
 
 ### 4. 数据集市生成 (Data Mart Generation)
 将计算结果分拆并输出为以下三个高度优化的 JSON 文件，直接供前端 Fetch。
@@ -36,7 +36,7 @@
 所有由 `processor.py` 生成的 JSON 文件均放在 `data/ui/` 目录下。
 
 ### 1. `ui_static_charts.json` (静态全局视图)
-专供不受前端时间范围调节器影响的 **C (每日热力图)** 和 **D (月度余额组合图)** 使用。所有金额均已**排除类型 3 和 4**。
+专供不受前端时间范围调节器影响的 **C (每日热力图)** 和 **D (月度余额组合图)** 使用。现金流相关金额基于 `all_inflow` / `all_outflow` 计算，包含所有 `type_code`。
 
 ```json
 {
@@ -72,13 +72,13 @@
       "end_balance": 50500.00,         // 当日末余额 (用于 A 当前余额、E 的折线)
       
       // --- 全量指标 (用于 B 现金流计算) ---
-      "all_inflow": 2000.00,           // 包含撤销与转账在内的所有流入
-      "all_outflow": -1500.00,         // 包含撤销与转账在内的所有流出
-      "net_internal_transfer": 500.00, // 仅类型 4 的流入 - 类型 4 的流出
+      "all_inflow": 2000.00,           // 包含撤销与转账在内的所有流入 (方向以 cashflow_direction 为准)
+      "all_outflow": -1500.00,         // 包含撤销与转账在内的所有流出 (方向以 cashflow_direction 为准)
+      "net_internal_transfer": 500.00, // 仅类型 4 的流入 - 类型 4 的流出 (方向以 cashflow_direction 为准)
 
       // --- 净指标 (用于 E 的柱状图) ---
-      "filtered_inflow": 1000.00,      // 排除类型 3、4 的流入
-      "filtered_outflow": -500.00      // 排除类型 3、4 的流出
+      "filtered_inflow": 1000.00,      // 排除类型 3、4 的流入 (方向以 cashflow_direction 为准)
+      "filtered_outflow": -500.00      // 排除类型 3、4 的流出 (方向以 cashflow_direction 为准)
     },
     // ... 一直到系统当天
   ]
@@ -95,6 +95,7 @@
 ### 3. `ui_transactions_and_categories.json` (明细与分类池)
 
 专供 **F (桑基图)**、**G (分类占比与排行)** 以及 **Transactions 列表页** 使用。由于分类的图表必须依据自定义时间范围实时重绘，后端需提供一个清洗后、附带所属类别的列表，以便前端极速求和聚合。
+*   **现金流方向**：每条交易必须包含 `cashflow_direction`，供 Transactions 列表页决定金额正负。
 
 ```json
 {
@@ -107,6 +108,7 @@
         "is_filtered": true,           // true 表示类型为 1 或 2，前端画图只统计为 true 的条目
         "category": "餐饮",
         "amount": 45.50,
+        "cashflow_direction": 2,
         "description": "麦当劳"
       }
       // ...

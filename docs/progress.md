@@ -40,6 +40,12 @@
   - 0 internal transfers detected (expected — single-account statements)
   - UI data marts regenerated successfully
 
+  ## 2026-05-11
+  - Added `cashflow_direction` to transactions schema and processing contract.
+  - Parser now writes `cashflow_direction` from initial `type_code`; refund/transfer detection only mutates `type_code`.
+  - Processor cashflow aggregation now uses `cashflow_direction` for all inflow/outflow calculations.
+  - Transactions list displays signed amounts based on `cashflow_direction`.
+
 ## Plan
 
 - [x] Implement src/backend/processor.py to generate UI JSON files.

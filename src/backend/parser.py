@@ -116,7 +116,7 @@ def _call_ai_with_retry(
     """
     last_was_no_txns = False
     for attempt in range(1, MAX_RETRIES + 1):
-        logger.info("%s attempt %d/%d", group_label, attempt, MAX_RETRIES)
+        logger.debug("%s attempt %d/%d", group_label, attempt, MAX_RETRIES)
         response_text = call_ai(client, system_prompt, images, logger)
         if not response_text:
             logger.error("%s attempt %d: API error (no response)", group_label, attempt)
@@ -126,7 +126,7 @@ def _call_ai_with_retry(
         if txns:
             logger.info("%s attempt %d: extracted %d transactions", group_label, attempt, len(txns))
             return txns, False
-        logger.warning("%s attempt %d: no valid transactions", group_label, attempt)
+        logger.debug("%s attempt %d: no valid transactions", group_label, attempt)
         last_was_no_txns = True
 
     if is_last_single_page and last_was_no_txns:
@@ -142,7 +142,7 @@ def _call_ai_worker(args: Tuple[int, int, int, List[str], str, str, str]) -> Tup
     is_last = gi == total_groups - 1
     is_single_page = len(group) == 1
     label = "Worker group %d/%d (%d images)" % (gi + 1, total_groups, len(group))
-    logger.info(label)
+    logger.debug(label)
     return gi, *_call_ai_with_retry(
         client, system_prompt, group, logger, label,
         is_last_single_page=(is_last and is_single_page),
@@ -187,7 +187,7 @@ def call_ai(
 
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            logger.info("API call attempt %d/%d (%d pages)", attempt, MAX_RETRIES, len(images))
+            logger.debug("API call attempt %d/%d (%d pages)", attempt, MAX_RETRIES, len(images))
             message = client.messages.create(
                 model=MODEL,
                 max_tokens=20480,
@@ -230,8 +230,8 @@ def call_ai_grouped(
         return json.dumps(txns, ensure_ascii=False)
 
     # Multiple groups — use process pool
-    logger.info("Splitting %d pages into %d groups (max %d per group), up to %d workers",
-                total_pages, len(groups), IMAGE_GROUP_SIZE, MAX_WORKERS)
+    logger.debug("Splitting %d pages into %d groups (max %d per group), up to %d workers",
+                 total_pages, len(groups), IMAGE_GROUP_SIZE, MAX_WORKERS)
 
     tasks = [
         (gi, len(groups), total_pages, group, system_prompt, api_key, BASE_URL)
@@ -317,11 +317,14 @@ def assign_transaction_ids(
         seq_map[key] = seq
         date_compact = date.replace("-", "")
         tx_id = f"TX-{account_code}-{date_compact}-{seq:03d}"
+        type_code = int(raw.get("type_code", 2))
+        cashflow_direction = 1 if type_code == 1 else 2
         tx = {
             "transaction_id": tx_id,
             "date": date,
             "account_code": account_code,
-            "type_code": int(raw.get("type_code", 2)),
+            "type_code": type_code,
+            "cashflow_direction": cashflow_direction,
             "currency": str(raw.get("currency", "CNY")),
             "amount": round(float(raw.get("amount", 0)), 2),
             "balance": round(float(raw.get("balance", 0)), 2),
@@ -357,7 +360,7 @@ def apply_dedup(
         key = (tx["account_code"], tx["date"])
         if key in existing_dates:
             dropped += 1
-            logger.info("Dedup: dropping %s %s (date already exists)", tx["account_code"], tx["date"])
+            logger.debug("Dedup: dropping %s %s (date already exists)", tx["account_code"], tx["date"])
         else:
             kept.append(tx)
     if dropped:
@@ -460,6 +463,7 @@ def detect_transfers(transactions: List[Dict[str, Any]], logger: logging.Logger)
                     "account_code": exp_account,
                     "date": exp["date"],
                     "type_code": 2,
+                    "cashflow_direction": 2,
                     "currency": "CNY",
                     "amount": fee,
                     "balance": 0,
@@ -520,22 +524,19 @@ def validate_single_account(raw_txns: List[Dict[str, Any]], logger: logging.Logg
 
 def main() -> None:
     logger = setup_logger()
-    logger.info("=" * 60)
-    logger.info("Parser started")
+    logger.info("--- Parser started ---")
 
     # Load accounts
     if not ACCOUNTS_PATH.exists():
         logger.error("accounts.json not found at %s", ACCOUNTS_PATH)
         return
     accounts = load_json(ACCOUNTS_PATH)
-    logger.info("Loaded %d accounts", len(accounts))
 
     # Load existing transactions
     if TRANSACTIONS_PATH.exists():
         transactions = load_json(TRANSACTIONS_PATH)
     else:
         transactions = []
-    logger.info("Existing transactions: %d", len(transactions))
 
     # Load parsed history
     if PARSED_PATH.exists():
@@ -543,28 +544,24 @@ def main() -> None:
     else:
         parsed_entries = []
     parsed_hashes: Set[str] = {entry["file_hash"] for entry in parsed_entries}
-    logger.info("Previously parsed files: %d", len(parsed_hashes))
 
     # Scan PDF directory
     pdf_files = sorted(PDF_DIR.glob("*.pdf"))
     if not pdf_files:
         logger.info("No PDF files found in %s", PDF_DIR)
         return
-    logger.info("Found %d PDF files", len(pdf_files))
 
     # Filter out already parsed
     unprocessed: List[Path] = []
     for pdf_path in pdf_files:
         file_hash = compute_file_hash(pdf_path)
-        if file_hash in parsed_hashes:
-            logger.info("Skipping already parsed: %s (hash: %s...)", pdf_path.name, file_hash[:16])
-        else:
+        if file_hash not in parsed_hashes:
             unprocessed.append(pdf_path)
 
     if not unprocessed:
-        logger.info("All PDFs already parsed. Nothing to do.")
+        logger.info("All %d PDFs already parsed. Nothing to do.", len(pdf_files))
         return
-    logger.info("Unprocessed PDFs: %d", len(unprocessed))
+    logger.info("Found %d PDFs, %d unprocessed", len(pdf_files), len(unprocessed))
 
     # Load prompt template
     system_prompt = build_system_prompt(accounts)
@@ -587,12 +584,11 @@ def main() -> None:
     # Process each PDF
     for pdf_path in unprocessed:
         file_hash = compute_file_hash(pdf_path)
-        logger.info("Processing: %s (hash: %s...)", pdf_path.name, file_hash[:16])
 
         # Render PDF to images
         try:
             images = render_pdf_to_images(pdf_path)
-            logger.info("Rendered %d pages to images", len(images))
+            logger.info("Processing %s (%d pages, hash: %s...)", pdf_path.name, len(images), file_hash[:16])
         except Exception as exc:
             logger.error("Failed to render PDF %s: %s", pdf_path.name, exc)
             continue
@@ -631,7 +627,7 @@ def main() -> None:
             "processed_at": processed_at,
             "account_code": account_code,
         })
-        logger.info("Assigned %d transaction IDs for %s (account: %s)", len(new_txns), pdf_path.name, account_code)
+        logger.debug("Assigned %d transaction IDs for %s (account: %s)", len(new_txns), pdf_path.name, account_code)
 
     if not all_new_txns:
         logger.info("No new transactions extracted from any PDF.")
@@ -648,7 +644,7 @@ def main() -> None:
 
     # Merge
     transactions.extend(all_new_txns)
-    logger.info("Total transactions after merge: %d", len(transactions))
+    logger.debug("Total transactions after merge: %d", len(transactions))
 
     # Refund detection on full dataset
     detect_refunds(transactions, logger)
@@ -666,22 +662,19 @@ def main() -> None:
             fee["processed_at"] = processed_at
             fee["source_hash"] = ""
         transactions.extend(fee_txns)
-        logger.info("Added %d fee transactions", len(fee_txns))
+        logger.debug("Added %d fee transactions", len(fee_txns))
 
     # Sort transactions for consistent output
     transactions.sort(key=lambda t: (t["date"], t["transaction_id"]))
 
     # Write outputs
     write_json(TRANSACTIONS_PATH, transactions)
-    logger.info("Wrote %d transactions to %s", len(transactions), TRANSACTIONS_PATH)
 
     parsed_entries.extend(new_parsed_entries)
     write_json(PARSED_PATH, parsed_entries)
-    logger.info("Updated parsed.json with %d new entries", len(new_parsed_entries))
 
-    logger.info("Parser finished. %d new transactions added from %d PDFs.",
-                len(all_new_txns) + len(fee_txns), len(unprocessed))
-    logger.info("=" * 60)
+    logger.info("Done: +%d new txns from %d PDFs, total %d transactions",
+                len(all_new_txns) + len(fee_txns), len(unprocessed), len(transactions))
 
 
 if __name__ == "__main__":

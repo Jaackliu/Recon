@@ -35,6 +35,7 @@
 | **交易日期** | `date` | String | AI API | 格式约定为 `YYYY-MM-DD`。 |
 | **银行账户代码** | `account_code` | String | AI API | 必须是 `accounts.json` 中已存在的代码。 |
 | **交易类型代码** | `type_code` | Integer | AI / Python | **1**: 收入, **2**: 支出 (AI 初始识别仅限 1 和 2)。<br>**3**: 撤销/报销, **4**: 内部转账 (由 Python 后期逻辑覆写)。 |
+| **现金流方向** | `cashflow_direction` | Integer | Python | **1**: 流入, **2**: 流出。由 AI 初始 `type_code` 在解析完成后立即写入，后续撤销/报销与内部转账识别 **只改 `type_code` 不改此字段**。现金流所有计算以此字段为准。 |
 | **货币** | `currency` | String | AI API | 目前仅支持 "CNY"。 |
 | **金额** | `amount` | Float | AI API | 交易绝对值金额（正数）。 |
 | **帐户余额** | `balance` | Float | AI API | 交易后的账户余额。 |
@@ -72,7 +73,12 @@ AI API 分类时只能输出以下确切的字符串之一：
 *   **逻辑**：如果新解析的 PDF 中，包含了 `transactions.json` 内对应 `account_code` 已经存在的日期的记录，必须**丢弃**新解析结果中该重叠日期的所有交易记录。
 *   **原则**：仅**增量更新**该账户以往未记录的新日期的交易，历史记录（已存入 `transactions.json` 的数据）保持不变。跨账户之间无需校验去重。
 
-### 2. 跨账户内部转账识别 (Internal Transfer)
+### 2. 现金流方向写入 (Cashflow Direction)
+AI 提取交易并完成字段校验后，Python 必须为每条交易写入 `cashflow_direction`。
+*   **规则**：`type_code: 1` → `cashflow_direction: 1` (流入)，`type_code: 2` → `cashflow_direction: 2` (流出)。
+*   **约束**：后续撤销/报销与内部转账识别只能修改 `type_code`，不得修改 `cashflow_direction`。所有现金流计算均以 `cashflow_direction` 为准。
+
+### 3. 跨账户内部转账识别 (Internal Transfer)
 该逻辑旨在将用户自己名下账户间的转账从“收入/支出”修改为“内部转账”，避免虚增总收支。
 *   **条件判定**：
     1.  账户 A 出现一笔 `type_code: 2` (支出)。
@@ -83,7 +89,7 @@ AI API 分类时只能输出以下确切的字符串之一：
     2.  计算差值：`手续费 = 支出金额 - 收入金额`。
     3.  若 `手续费 > 0`，则由 Python 生成一条新的交易记录归属于账户 A（类型：`2` 支出，类别：`其他` 或专属手续费类别），与这笔转账记录绑定。
 
-### 3. 撤销/报销识别 (Refund / Reimbursement)
+### 4. 撤销/报销识别 (Refund / Reimbursement)
 该逻辑旨在识别同一账户内，被退回或报销的款项。
 *   **条件判定 1 (带小数金额)**：账户内存在一笔带小数的支出，且在 **60天内** 同一账户出现一笔金额完全相等的收入。
 *   **条件判定 2 (大额整数金额)**：账户内存在一笔整数支出且金额 `> 5`，且在 **30天内** 同一账户出现一笔金额完全相等的收入。
@@ -101,6 +107,7 @@ AI API 分类时只能输出以下确切的字符串之一：
     *   校验单 PDF 单账户原则。
     *   执行防重去重逻辑。
     *   生成 `transaction_id`、写入 `source_hash` 和 `processed_at`。
+    *   基于 AI 初始 `type_code` 写入 `cashflow_direction`。
     *   执行多帐户内部转账与撤销/报销的二次逻辑判定与数据修改。
     *   更新 `transactions.json` 和 `parsed.json`。
 *   **`processor.py` (数据聚合引擎)**：

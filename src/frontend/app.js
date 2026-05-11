@@ -718,7 +718,7 @@ function updateTransactionsView() {
       </div>
       <div class="meta">${escapeHtml(item.id)}</div>
       <div><span class="tag ${item.type}">${formatType(item.type)}</span></div>
-      <div class="transaction-amount">${formatSignedMoney(item.amount, item.type)}</div>
+      <div class="transaction-amount">${formatSignedMoney(item.amount, item.cashflow_direction)}</div>
     `;
     dom.transactionsList.appendChild(row);
   });
@@ -844,8 +844,8 @@ function formatMoney(value) {
   })}`;
 }
 
-function formatSignedMoney(value, type) {
-  const sign = type === "expense" || type === "transfer" ? "-" : "+";
+function formatSignedMoney(value, direction) {
+  const sign = Number(direction) === 2 ? "-" : "+";
   return `${sign}${formatMoney(value)}`;
 }
 
