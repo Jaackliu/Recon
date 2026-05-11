@@ -61,7 +61,7 @@ const dom = {
   closeRangeModal: document.getElementById("closeRangeModal"),
   customRange: document.getElementById("customRange"),
   toast: document.getElementById("toast"),
-  toggleMotion: document.getElementById("toggleMotion")
+  settingsBtn: document.getElementById("settingsBtn")
 };
 
 const palette = ["#ff385c", "#ff8b5a", "#f5c542", "#33b28a", "#2f80ed", "#222222", "#ff9aa7"];
@@ -198,16 +198,6 @@ function bindEvents() {
     state.transactionFilters[filter] = !state.transactionFilters[filter];
     button.classList.toggle("is-active", state.transactionFilters[filter]);
     updateTransactionsView();
-  });
-
-  dom.toggleMotion.addEventListener("change", () => {
-    if (!dom.toggleMotion.checked) {
-      document.querySelectorAll(".reveal").forEach((card) => {
-        card.classList.add("is-visible");
-      });
-    } else {
-      revealCards();
-    }
   });
 
   window.addEventListener("resize", () => {
@@ -429,7 +419,16 @@ function updateMonthlyChart() {
   const outflow = staticData.monthly_combo.map((entry) => entry.outflow);
 
   const option = {
-    tooltip: { trigger: "axis" },
+    tooltip: {
+      trigger: "axis",
+      formatter: (params) => {
+        let result = params[0].axisValue + "<br/>";
+        params.forEach((p) => {
+          result += `${p.marker} ${p.seriesName}: ${formatMoney(p.value)}<br/>`;
+        });
+        return result;
+      }
+    },
     legend: { show: false },
     grid: { left: 1.5, right: 1.5, top: 16, bottom: -2, containLabel: true },
     xAxis: {
@@ -491,14 +490,23 @@ function updateMonthlyChart() {
 function updateDailyChart(slice) {
   const dates = slice.map((entry) => entry.date);
   const balances = slice.map((entry) => entry.end_balance);
-  const inflow = slice.map((entry) => entry.filtered_inflow);
-  const outflow = slice.map((entry) => entry.filtered_outflow);
+  const inflow = slice.map((entry) => entry.all_inflow);
+  const outflow = slice.map((entry) => entry.all_outflow);
   const balanceMin = Math.min(...balances);
   const balanceMax = Math.max(...balances);
   const balancePad = Math.max((balanceMax - balanceMin) * 0.08, balanceMax * 0.002, 1);
 
   const option = {
-    tooltip: { trigger: "axis" },
+    tooltip: {
+      trigger: "axis",
+      formatter: (params) => {
+        let result = params[0].axisValue + "<br/>";
+        params.forEach((p) => {
+          result += `${p.marker} ${p.seriesName}: ${formatMoney(p.value)}<br/>`;
+        });
+        return result;
+      }
+    },
     grid: { left: 48, right: 28, top: 28, bottom: 30, containLabel: true },
     xAxis: {
       type: "category",
@@ -615,7 +623,15 @@ function updateSankey() {
   });
 
   const option = {
-    tooltip: { trigger: "item" },
+    tooltip: {
+      trigger: "item",
+      formatter: (params) => {
+        if (params.dataType === "edge") {
+          return `${params.data.source} → ${params.data.target}<br/>${formatMoney(params.data.value)}`;
+        }
+        return `${params.name}<br/>${formatMoney(params.value)}`;
+      }
+    },
     series: [
       {
         type: "sankey",
@@ -651,7 +667,10 @@ function updateCategoryPanel() {
   }));
 
   const option = {
-    tooltip: { trigger: "item" },
+    tooltip: {
+      trigger: "item",
+      formatter: (params) => `${params.name}<br/>${formatMoney(params.value)} (${params.percent}%)`
+    },
     series: [
       {
         type: "pie",
@@ -729,6 +748,12 @@ function getRange(series) {
     startDate = series[Math.max(series.length - 7, 0)].date;
   } else if (state.rangeMode === "30") {
     startDate = series[Math.max(series.length - 30, 0)].date;
+  } else if (state.rangeMode === "90") {
+    startDate = series[Math.max(series.length - 90, 0)].date;
+  } else if (state.rangeMode === "180") {
+    startDate = series[Math.max(series.length - 180, 0)].date;
+  } else if (state.rangeMode === "365") {
+    startDate = series[Math.max(series.length - 365, 0)].date;
   } else if (state.rangeMode === "custom") {
     startDate = clampDate(state.customRange.start, series[0].date, endDate);
     const customEnd = clampDate(state.customRange.end, series[0].date, endDate);
@@ -762,12 +787,13 @@ function getBalanceAtDate(series, date) {
 }
 
 function getDelta(series, range) {
-  if (state.rangeMode !== "7" && state.rangeMode !== "30") {
+  const daysMap = { "7": 7, "30": 30, "90": 90, "180": 180, "365": 365 };
+  const days = daysMap[state.rangeMode];
+  if (!days) {
     return { label: "Change hidden", status: "neutral" };
   }
 
   const endIndex = series.findIndex((entry) => entry.date === range.endDate);
-  const days = state.rangeMode === "7" ? 7 : 30;
   const prevIndex = endIndex - days;
   if (endIndex < 0 || prevIndex < 0) {
     return { label: "Change hidden", status: "neutral" };
@@ -835,13 +861,14 @@ function formatType(type) {
 }
 
 function formatK(value) {
-  const abs = Math.abs(value);
+  const rounded = Math.round(value * 100) / 100;
+  const abs = Math.abs(rounded);
   if (abs >= 1000) {
-    const k = value / 1000;
+    const k = rounded / 1000;
     const str = k % 1 === 0 ? k.toFixed(0) : parseFloat(k.toFixed(1)).toString();
     return str + "k";
   }
-  return String(value);
+  return String(rounded);
 }
 
 function renderDonutLegend(data) {
@@ -867,7 +894,6 @@ function showEmptyDashboard() {
 }
 
 function revealCards() {
-  if (!dom.toggleMotion.checked) return;
   const cards = Array.from(document.querySelectorAll(".reveal"));
   cards.forEach((card, index) => {
     setTimeout(() => {

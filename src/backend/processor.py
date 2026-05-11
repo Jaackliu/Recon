@@ -275,7 +275,7 @@ def build_heatmap(series: List[Dict[str, Any]], days: int = 90) -> List[Dict[str
     slice_series = series[-days:] if len(series) > days else series
     heatmap = []
     for entry in slice_series:
-        net_inflow = float(entry["filtered_inflow"]) + float(entry["filtered_outflow"])
+        net_inflow = float(entry["all_inflow"]) + float(entry["all_outflow"])
         heatmap.append(
             {
                 "date": entry["date"],
@@ -298,8 +298,8 @@ def build_monthly_combo(series: List[Dict[str, Any]], months: int = 12) -> List[
             month_stats[month_key] = {"end_balance": 0.0, "inflow": 0.0, "outflow": 0.0}
             month_order.append(month_key)
         month_stats[month_key]["end_balance"] = float(entry["end_balance"])
-        month_stats[month_key]["inflow"] += float(entry["filtered_inflow"])
-        month_stats[month_key]["outflow"] += float(entry["filtered_outflow"])
+        month_stats[month_key]["inflow"] += float(entry["all_inflow"])
+        month_stats[month_key]["outflow"] += float(entry["all_outflow"])
 
     recent_months = month_order[-months:]
     output = []
