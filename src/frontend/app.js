@@ -300,10 +300,15 @@ function updateBalanceOverview(series, slice, range) {
   dom.balanceMeta.textContent = `End balance on ${range.endDate}`;
 
   const delta = getDelta(series, range);
-  dom.balanceDelta.textContent = delta.label;
-  dom.balanceDelta.className = "delta";
-  if (delta.status !== "neutral") {
-    dom.balanceDelta.classList.add(delta.status === "positive" ? "is-positive" : "is-negative");
+  if (delta.label === "Change hidden") {
+    dom.balanceDelta.style.display = "none";
+  } else {
+    dom.balanceDelta.style.display = "";
+    dom.balanceDelta.textContent = delta.label;
+    dom.balanceDelta.className = "delta";
+    if (delta.status !== "neutral") {
+      dom.balanceDelta.classList.add(delta.status === "positive" ? "is-positive" : "is-negative");
+    }
   }
 
   dom.accountBreakdown.innerHTML = "";
@@ -325,7 +330,7 @@ function updateBalanceOverview(series, slice, range) {
 function updateCashflow(slice) {
   const inflow = sumBy(slice, "all_inflow");
   const outflow = sumBy(slice, "all_outflow");
-  const netflow = inflow + outflow;
+  const netflow = round2(inflow + outflow);
   const transfer = sumBy(slice, "net_internal_transfer");
 
   dom.netflowValue.textContent = formatMoney(netflow);
@@ -426,22 +431,27 @@ function updateMonthlyChart() {
   const option = {
     tooltip: { trigger: "axis" },
     legend: { show: false },
-    grid: { left: 38, right: 16, top: 22, bottom: 26, containLabel: true },
+    grid: { left: 1.5, right: 1.5, top: 16, bottom: -2, containLabel: true },
     xAxis: {
       type: "category",
       data: months,
       axisLine: { lineStyle: { color: "#dddddd" } },
-      axisLabel: { color: "#6a6a6a", fontSize: 10 }
+      axisLabel: {
+        color: "#6a6a6a",
+        fontSize: 10,
+        interval: 0,
+        formatter: (val) => val.includes("-") ? val.split("-").pop() : val
+      }
     },
     yAxis: [
       {
         type: "value",
-        axisLabel: { color: "#6a6a6a", fontSize: 10 },
+        axisLabel: { color: "#6a6a6a", fontSize: 10, formatter: formatK },
         splitLine: { lineStyle: { color: "#ebebeb" } }
       },
       {
         type: "value",
-        axisLabel: { color: "#6a6a6a", fontSize: 10 },
+        axisLabel: { color: "#6a6a6a", fontSize: 10, formatter: formatK },
         splitLine: { show: false }
       }
     ],
@@ -453,7 +463,7 @@ function updateMonthlyChart() {
         yAxisIndex: 1,
         itemStyle: { color: "#ff385c" },
         stack: "flow",
-        barWidth: 24
+        barWidth: 4
       },
       {
         name: "Outflow",
@@ -462,7 +472,7 @@ function updateMonthlyChart() {
         yAxisIndex: 1,
         itemStyle: { color: "rgba(34,34,34,0.35)" },
         stack: "flow",
-        barWidth: 24
+        barWidth: 4
       },
       {
         name: "Balance",
@@ -499,15 +509,21 @@ function updateDailyChart(slice) {
     yAxis: [
       {
         type: "value",
-        min: balanceMin - balancePad,
-        max: balanceMax + balancePad,
+        min: Math.round((balanceMin - balancePad) * 100) / 100,
+        max: Math.round((balanceMax + balancePad) * 100) / 100,
         scale: true,
-        axisLabel: { color: "#6a6a6a" },
+        axisLabel: {
+          color: "#6a6a6a",
+          formatter: (val) => {
+            const rounded = Math.round(val * 100) / 100;
+            return formatK(rounded);
+          }
+        },
         splitLine: { lineStyle: { color: "#ebebeb" } }
       },
       {
         type: "value",
-        axisLabel: { color: "#6a6a6a" },
+        axisLabel: { color: "#6a6a6a", formatter: formatK },
         splitLine: { show: false }
       }
     ],
@@ -518,7 +534,8 @@ function updateDailyChart(slice) {
         data: inflow,
         yAxisIndex: 1,
         itemStyle: { color: "#ff385c" },
-        stack: "daily"
+        stack: "daily",
+        barMaxWidth: 6
       },
       {
         name: "Outflow",
@@ -526,7 +543,8 @@ function updateDailyChart(slice) {
         data: outflow,
         yAxisIndex: 1,
         itemStyle: { color: "rgba(34,34,34,0.35)" },
-        stack: "daily"
+        stack: "daily",
+        barMaxWidth: 18
       },
       {
         name: "Balance",
@@ -560,38 +578,40 @@ function updateSankey() {
   const expense = groupByCategory(filtered.filter((item) => item.type === "expense"));
   const sumIncome = sumValues(income);
   const sumExpense = sumValues(expense);
-  const flowThrough = Math.min(sumIncome, sumExpense);
+  const flowThrough = round2(Math.min(sumIncome, sumExpense));
 
-  const nodes = new Set();
+  const data = [];
   const links = [];
 
+  // Level 0: income categories
   Object.keys(income).forEach((category) => {
-    const nodeName = `收入: ${category}`;
-    nodes.add(nodeName);
-    links.push({ source: nodeName, target: "Total Income", value: income[category] });
+    const name = `收入: ${category}`;
+    data.push({ name, depth: 0 });
+    links.push({ source: name, target: "Total Income", value: income[category] });
   });
 
-  nodes.add("Total Income");
-  nodes.add("Total Expense");
-
+  // Level 1: Total Income + Use Balance
+  data.push({ name: "Total Income", depth: 1 });
+  if (sumExpense > sumIncome) {
+    data.push({ name: "Use Balance", depth: 1 });
+    links.push({ source: "Use Balance", target: "Total Expense", value: round2(sumExpense - sumIncome) });
+  }
   if (flowThrough > 0) {
     links.push({ source: "Total Income", target: "Total Expense", value: flowThrough });
   }
 
-  if (sumExpense > sumIncome) {
-    nodes.add("Use Balance");
-    links.push({ source: "Use Balance", target: "Total Expense", value: sumExpense - sumIncome });
-  }
-
+  // Level 2: Total Expense + Retained
+  data.push({ name: "Total Expense", depth: 2 });
   if (sumIncome > sumExpense) {
-    nodes.add("Retained");
-    links.push({ source: "Total Income", target: "Retained", value: sumIncome - sumExpense });
+    data.push({ name: "Retained", depth: 2 });
+    links.push({ source: "Total Income", target: "Retained", value: round2(sumIncome - sumExpense) });
   }
 
+  // Level 3: expense categories
   Object.keys(expense).forEach((category) => {
-    const nodeName = `支出: ${category}`;
-    nodes.add(nodeName);
-    links.push({ source: "Total Expense", target: nodeName, value: expense[category] });
+    const name = `支出: ${category}`;
+    data.push({ name, depth: 3 });
+    links.push({ source: "Total Expense", target: name, value: expense[category] });
   });
 
   const option = {
@@ -599,7 +619,7 @@ function updateSankey() {
     series: [
       {
         type: "sankey",
-        data: Array.from(nodes).map((name) => ({ name })),
+        data,
         links,
         emphasis: { focus: "adjacency" },
         lineStyle: { color: "gradient", curveness: 0.5 },
@@ -770,25 +790,29 @@ function getAccountLabel(code) {
   return account ? account.alias || account.account_name : code;
 }
 
+function round2(n) {
+  return Math.round(n * 100) / 100;
+}
+
 function sumBy(list, key) {
-  return list.reduce((sum, item) => sum + (Number(item[key]) || 0), 0);
+  return round2(list.reduce((sum, item) => sum + (Number(item[key]) || 0), 0));
 }
 
 function groupByCategory(items) {
   return items.reduce((acc, item) => {
-    acc[item.category] = (acc[item.category] || 0) + item.amount;
+    acc[item.category] = round2((acc[item.category] || 0) + item.amount);
     return acc;
   }, {});
 }
 
 function sumValues(map) {
-  return Object.values(map).reduce((sum, value) => sum + value, 0);
+  return round2(Object.values(map).reduce((sum, value) => sum + value, 0));
 }
 
 function formatMoney(value) {
   const amount = Number(value) || 0;
   const sign = amount < 0 ? "-" : "";
-  return `${sign}CNY ${Math.abs(amount).toLocaleString("en-US", {
+  return `${sign}¥${Math.abs(amount).toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   })}`;
@@ -808,6 +832,16 @@ function formatRatio(value, base, sign) {
 
 function formatType(type) {
   return type.charAt(0).toUpperCase() + type.slice(1);
+}
+
+function formatK(value) {
+  const abs = Math.abs(value);
+  if (abs >= 1000) {
+    const k = value / 1000;
+    const str = k % 1 === 0 ? k.toFixed(0) : parseFloat(k.toFixed(1)).toString();
+    return str + "k";
+  }
+  return String(value);
 }
 
 function renderDonutLegend(data) {

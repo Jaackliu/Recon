@@ -360,7 +360,7 @@ input {
   gap: var(--space-base);
 }
 
-.card-header > div {
+.card-header > div:first-child {
   min-width: 0;
   flex: 1;
 }
@@ -392,6 +392,9 @@ input {
   background: var(--surface-soft);
   color: var(--muted);
   align-self: flex-start;
+  margin-left: auto;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .delta.is-positive {
