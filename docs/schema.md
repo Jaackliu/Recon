@@ -6,9 +6,20 @@
 
 ## 一、 核心数据模型 (Schemas)
 
-所有 JSON 数据文件均要求严格的格式规范，**任何字段都不允许出现空值 (null/undefined)**。目前系统基础货币仅支持人民币 (CNY)。
+所有 JSON 数据文件均要求严格的格式规范，**任何字段都不允许出现空值 (null/undefined)**。系统支持的币种以 `currency.json` 为准，交易与账户字段只使用货币代码。
 
-### 1. `accounts.json` (银行账户配置)
+### 1. `currency.json` (货币配置)
+本文件由人工手动维护（后端手动新增，前端与 AI API 无权新增），记录系统支持的所有货币类型。
+
+结构为 JSON 数组，每个对象包含以下字段：
+
+| 字段名 | 键名 (Key) | 数据类型 | 说明 / 约束 |
+| :--- | :--- | :--- | :--- |
+| **货币代码** | `currency_code` | String | **主键**。两位数字字符串（例："01"），全系统唯一。 |
+| **货币名称** | `currency_name` | String | 用于 AI API 识别（例："人民币"、"美元"、"港币"）。 |
+| **货币符号** | `currency_symbol` | String | 用于前端显示（例："￥"、"$"、"HK$"）。 |
+
+### 2. `accounts.json` (银行账户配置)
 本文件由人工手动维护（后端手动新增，前端与 AI API 无权新增）。AI API 解析账单时必须引入此文件作为 Prompt 上下文，以确保识别出的账户代码完全合法。
 
 结构为 JSON 数组，每个对象包含以下字段：
@@ -21,10 +32,10 @@
 | **发行银行** | `bank_name` | String | 发卡行名称（例："招商银行"）。 |
 | **账号** | `account_number` | String | 银行卡号或统一账号。 |
 | **持有人名称** | `holder_name` | String | 账户持有人姓名。 |
-| **默认币种** | `default_currency` | String | 默认为 "CNY"（人民币）。 |
-| **支持币种** | `supported_currencies`| Array[String] | 包含支持的币种代码数组，目前限定为 `["CNY"]`。 |
+| **默认币种代码** | `default_currency` | String | `currency.json` 中已定义的 `currency_code`。 |
+| **支持币种代码** | `supported_currencies`| Array[String] | 包含支持的币种代码数组，元素必须为 `currency.json` 中已定义的 `currency_code`。 |
 
-### 2. `transactions.json` (交易记录流水)
+### 3. `transactions.json` (交易记录流水)
 本文件存储所有的历史交易明细。由 AI API 解析账单生成初始数据，再由后端 Python 脚本（`parser.py`）清洗、拼接和重写字段后追加保存。
 
 结构为 JSON 数组，每个对象包含以下字段：
@@ -36,7 +47,7 @@
 | **银行账户代码** | `account_code` | String | AI API | 必须是 `accounts.json` 中已存在的代码。 |
 | **交易类型代码** | `type_code` | Integer | AI / Python | **1**: 收入, **2**: 支出 (AI 初始识别仅限 1 和 2)。<br>**3**: 撤销/报销, **4**: 内部转账 (由 Python 后期逻辑覆写)。 |
 | **现金流方向** | `cashflow_direction` | Integer | Python | **1**: 流入, **2**: 流出。由 AI 初始 `type_code` 在解析完成后立即写入，后续撤销/报销与内部转账识别 **只改 `type_code` 不改此字段**。现金流所有计算以此字段为准。 |
-| **货币** | `currency` | String | AI API | 目前仅支持 "CNY"。 |
+| **货币代码** | `currency` | String | AI API | 必须为 `currency.json` 中已定义的 `currency_code`，且必须在对应账户的 `supported_currencies` 中。 |
 | **金额** | `amount` | Float | AI API | 交易绝对值金额（正数）。 |
 | **帐户余额** | `balance` | Float | AI API | 交易后的账户余额。 |
 | **收支类别** | `category` | String | AI API | **必须严格匹配系统设定的枚举值**（详见下文枚举规范），不可无类别。 |
@@ -50,7 +61,7 @@ AI API 分类时只能输出以下确切的字符串之一：
 *   **支出类别枚举**：`交通`, `餐饮`, `生活`, `购物`, `居住`, `文娱旅游`, `订阅`, `通讯`, `行政`, `外部转账`, `其他`
 *   **收入类别枚举**：`外部转账`, `工资`, `奖学金`, `补助`, `税息`, `其他`
 
-### 3. `parsed.json` (解析历史记录)
+### 4. `parsed.json` (解析历史记录)
 用于记录已经处理过的银行账单 PDF，防止重复调用 AI API。所有字段均由 Python 维护。
 
 结构为 JSON 数组（或以 `file_hash` 为 Key 的 Object），每个条目包含以下字段：
@@ -81,6 +92,8 @@ AI 提取交易并完成字段校验后，Python 必须为每条交易写入 `ca
 ### 3. 跨账户内部转账识别 (Internal Transfer)
 该逻辑旨在将用户自己名下账户间的转账从”收入/支出”修改为”内部转账”，避免虚增总收支。
 
+*   **币种约束**：仅在**同一货币代码**内进行匹配与识别，不跨币种配对。
+
 *   **条件判定**（基于 `cashflow_direction` 匹配，`type_code` 仅作为结果标记）：
     1.  账户 A 出现一笔 `cashflow_direction: 2` (流出)。
     2.  在支出发生后的 **3天内**，账户 B (B != A) 出现一笔 `cashflow_direction: 1` (流入)。
@@ -93,6 +106,8 @@ AI 提取交易并完成字段校验后，Python 必须为每条交易写入 `ca
 ### 4. 撤销/报销识别 (Refund / Reimbursement)
 该逻辑旨在识别同一账户内，被退回或报销的款项。
 
+*   **币种约束**：仅在**同一货币代码**内进行匹配与识别，不跨币种配对。
+
 *   **匹配基准**：基于 `cashflow_direction` 判定资金流向，`type_code` 仅作为结果标记。
 *   **条件判定 1 (带小数金额)**：账户内存在一笔 `cashflow_direction: 2` (流出) 且带小数的记录，且在 **60天内** 同一账户出现一笔 `cashflow_direction: 1` (流入) 且金额完全相等的记录。
 *   **条件判定 2 (大额整数金额)**：账户内存在一笔 `cashflow_direction: 2` (流出) 且为整数且金额 `> 5` 的记录，且在 **30天内** 同一账户出现一笔 `cashflow_direction: 1` (流入) 且金额完全相等的记录。
@@ -101,8 +116,8 @@ AI 提取交易并完成字段校验后，Python 必须为每条交易写入 `ca
 
 ### 5. 余额一致性校验 (Balance Consistency Check)
 该逻辑用于确保 AI 识别的金额方向与余额变化一致，防止错误入库。
-*   **校验维度**：以 `source_hash` 为单位，每个 PDF 单独校验。
-*   **校验规则**：按同一账户内 `date` + `transaction_id` 顺序，使用 `cashflow_direction` 与 `amount` 计算上一笔余额到当前余额的变动是否一致。
+*   **校验维度**：以 `source_hash` + `currency` 为单位，每个 PDF 的每种币种独立校验。
+*   **校验规则**：按同一账户、同一币种内 `date` + `transaction_id` 顺序，使用 `cashflow_direction` 与 `amount` 计算上一笔余额到当前余额的变动是否一致。
 *   **异常处理 (check_transactions.py)**：若发现不一致，记录 PDF 文件名/哈希与出错交易明细，并将该 PDF 对应交易从 `transactions.json` 与 `parsed.json` 删除，便于重跑。
 *   **parser 集成**：在撤销/报销与内部转账识别之前执行校验；若发现不一致，自动重跑该 PDF 的 AI 解析并复检，最多 3 次；连续失败则记录问题并移除该 PDF 数据，继续其他流程。
 
@@ -111,7 +126,7 @@ AI 提取交易并完成字段校验后，Python 必须为每条交易写入 `ca
 ## 三、 架构分工与工程约束
 
 ### 1. 模块职责
-*   **AI API 交互层**：通过单一的 TXT Prompt（包含业务说明与 `accounts.json`），让 AI 同时完成 PDF 读取和中间 JSON 提取。
+*   **AI API 交互层**：通过单一的 TXT Prompt（包含业务说明、`accounts.json` 与 `currency.json` 货币图例），让 AI 同时完成 PDF 读取和中间 JSON 提取。
 *   **`parser.py` (数据入库引擎)**：
     *   调用 AI API 并接收初步解析结果。
     *   校验单 PDF 单账户原则。

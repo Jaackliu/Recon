@@ -56,6 +56,13 @@
   - Parser: `detect_refunds` and `detect_transfers` matching logic changed from `type_code` to `cashflow_direction` (2=outflow for expense, 1=inflow for income). `type_code` is only mutated as the result marker.
   - Extracted refund/transfer detection into `src/backend/detect_reclassify.py` — runnable standalone (`python detect_reclassify.py`) or importable by `parser.py`. Logs to `data/logs/detect_reclassify.log`.
 
+## 2026-05-12
+- Multi-currency schema introduced in [docs/schema.md](docs/schema.md): added `currency.json`, and switched account/transaction currency fields to currency codes.
+- Created `data/database/currency.json` with CNY/USD/HKD/EUR/JPY definitions.
+- Updated `data/database/accounts.json` to use currency codes and expanded supported currencies.
+- Parser prompt now includes currency legend and enforces supported currency selection; default currency is not passed to AI.
+- Balance checks and refund/transfer detection updated to run per PDF per currency.
+
 ## Plan
 
 - [x] Implement src/backend/processor.py to generate UI JSON files.
