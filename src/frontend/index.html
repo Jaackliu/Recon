@@ -4,6 +4,15 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Personal Finance Dashboard</title>
+    <script>
+      (function() {
+        var theme = localStorage.getItem("theme") || "system";
+        var resolved = theme === "system"
+          ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+          : theme;
+        document.documentElement.setAttribute("data-theme", resolved);
+      })();
+    </script>
     <link rel="stylesheet" href="styles.css" />
     <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js" defer></script>
     <script src="app.js" defer></script>
@@ -49,8 +58,12 @@
           </div>
 
           <div class="panel panel-muted">
-            <div class="panel-title">Settings</div>
-            <button class="pill pill-wide" id="settingsBtn">Settings</button>
+            <div class="panel-title">Theme</div>
+            <div class="theme-buttons" id="themeButtons">
+              <button class="pill is-active" data-theme="system">System</button>
+              <button class="pill" data-theme="light">Light</button>
+              <button class="pill" data-theme="dark">Dark</button>
+            </div>
           </div>
         </aside>
 
