@@ -8,6 +8,7 @@ const DATA_PATHS = {
 const state = {
   view: "dashboard",
   account: null,
+  theme: localStorage.getItem("theme") || "system",
   rangeMode: "30",
   customRange: {
     start: "",
@@ -82,15 +83,58 @@ const dom = {
   detailList: document.getElementById("detailList"),
   detailClose: document.getElementById("detailClose"),
   toast: document.getElementById("toast"),
-  settingsBtn: document.getElementById("settingsBtn")
+  themeButtons: document.getElementById("themeButtons")
 };
 
 const palette = ["#ff385c", "#ff8b5a", "#f5c542", "#33b28a", "#2f80ed", "#222222", "#ff9aa7"];
 
+function getChartTheme() {
+  const s = getComputedStyle(document.documentElement);
+  return {
+    muted: s.getPropertyValue("--muted").trim(),
+    hairline: s.getPropertyValue("--hairline").trim(),
+    hairlineSoft: s.getPropertyValue("--hairline-soft").trim(),
+    canvas: s.getPropertyValue("--canvas").trim(),
+    ink: s.getPropertyValue("--ink").trim(),
+    rausch: s.getPropertyValue("--rausch").trim(),
+    heatmap: [
+      s.getPropertyValue("--heatmap-0").trim(),
+      s.getPropertyValue("--heatmap-1").trim(),
+      s.getPropertyValue("--heatmap-2").trim(),
+      s.getPropertyValue("--heatmap-3").trim(),
+      s.getPropertyValue("--heatmap-4").trim()
+    ]
+  };
+}
+
 init();
+
+function applyTheme(mode) {
+  let resolved = mode;
+  if (mode === "system") {
+    resolved = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  document.documentElement.setAttribute("data-theme", resolved);
+}
+
+function reinitCharts() {
+  Object.values(state.charts).forEach((chart) => {
+    if (chart) chart.dispose();
+  });
+  state.charts = {};
+  initCharts();
+  updateAll();
+}
+
+function setActiveThemeButton() {
+  document.querySelectorAll(".theme-buttons .pill").forEach((pill) => {
+    pill.classList.toggle("is-active", pill.dataset.theme === state.theme);
+  });
+}
 
 async function init() {
   try {
+    applyTheme(state.theme);
     const [accounts, dailySeries, staticCharts, transactions] = await Promise.all([
       fetchJson(DATA_PATHS.accounts),
       fetchJson(DATA_PATHS.dailySeries),
@@ -204,8 +248,22 @@ function bindEvents() {
     const button = event.target.closest(".filter-chip");
     if (!button) return;
     const filter = button.dataset.filter;
-    state.detail.filters[filter] = !state.detail.filters[filter];
-    button.classList.toggle("is-active", state.detail.filters[filter]);
+    const activeCount = Object.values(state.detail.filters).filter(Boolean).length;
+    if (activeCount === 1 && state.detail.filters[filter]) {
+      Object.keys(state.detail.filters).forEach((k) => { state.detail.filters[k] = true; });
+    } else {
+      state.detail.filters[filter] = !state.detail.filters[filter];
+    }
+    syncFilterButtons(state.detail.filters, dom.detailFilters);
+    renderDetailList();
+  });
+
+  dom.detailFilters.addEventListener("dblclick", (event) => {
+    const button = event.target.closest(".filter-chip");
+    if (!button) return;
+    const filter = button.dataset.filter;
+    Object.keys(state.detail.filters).forEach((k) => { state.detail.filters[k] = k === filter; });
+    syncFilterButtons(state.detail.filters, dom.detailFilters);
     renderDetailList();
   });
 
@@ -233,9 +291,40 @@ function bindEvents() {
     const button = event.target.closest(".filter-chip");
     if (!button) return;
     const filter = button.dataset.filter;
-    state.transactionFilters[filter] = !state.transactionFilters[filter];
-    button.classList.toggle("is-active", state.transactionFilters[filter]);
+    const activeCount = Object.values(state.transactionFilters).filter(Boolean).length;
+    if (activeCount === 1 && state.transactionFilters[filter]) {
+      Object.keys(state.transactionFilters).forEach((k) => { state.transactionFilters[k] = true; });
+    } else {
+      state.transactionFilters[filter] = !state.transactionFilters[filter];
+    }
+    syncFilterButtons(state.transactionFilters, dom.transactionFilters);
     updateTransactionsView();
+  });
+
+  dom.transactionFilters.addEventListener("dblclick", (event) => {
+    const button = event.target.closest(".filter-chip");
+    if (!button) return;
+    const filter = button.dataset.filter;
+    Object.keys(state.transactionFilters).forEach((k) => { state.transactionFilters[k] = k === filter; });
+    syncFilterButtons(state.transactionFilters, dom.transactionFilters);
+    updateTransactionsView();
+  });
+
+  dom.themeButtons.addEventListener("click", (event) => {
+    const button = event.target.closest(".pill");
+    if (!button) return;
+    state.theme = button.dataset.theme;
+    localStorage.setItem("theme", state.theme);
+    applyTheme(state.theme);
+    setActiveThemeButton();
+    reinitCharts();
+  });
+
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+    if (state.theme === "system") {
+      applyTheme("system");
+      reinitCharts();
+    }
   });
 
   window.addEventListener("resize", () => {
@@ -247,6 +336,7 @@ function setInitialSelections() {
   setActiveAccount();
   setActiveRangeButton();
   setActiveCategoryToggle();
+  setActiveThemeButton();
 }
 
 function setView(view) {
@@ -399,6 +489,7 @@ function updateHeatmap() {
   const cellHeight = Math.floor((chartHeight - 28) / 7);
   const cellSize = Math.max(Math.min(cellWidth, cellHeight), 8);
 
+  const theme = getChartTheme();
   const option = {
     tooltip: {
       formatter: (params) => `${params.data[0]}<br/>${formatMoney(params.data[1])}`
@@ -408,7 +499,7 @@ function updateHeatmap() {
       max: rangeAbs,
       show: false,
       inRange: {
-        color: ["#2f80ed", "#9fc2ff", "#ebedf0", "#ff9aa7", "#ff385c"]
+        color: theme.heatmap
       }
     },
     calendar: {
@@ -420,7 +511,7 @@ function updateHeatmap() {
       bottom: 6,
       orient: "horizontal",
       itemStyle: {
-        borderColor: "#ffffff",
+        borderColor: theme.canvas,
         borderWidth: 2,
         borderRadius: 2
       },
@@ -430,7 +521,7 @@ function updateHeatmap() {
       yearLabel: { show: false },
       monthLabel: {
         show: true,
-        color: "#6a6a6a",
+        color: theme.muted,
         fontSize: 10,
         margin: 4,
         nameMap: "en",
@@ -457,6 +548,7 @@ function updateMonthlyChart() {
   const inflow = staticData.monthly_combo.map((entry) => entry.inflow);
   const outflow = staticData.monthly_combo.map((entry) => entry.outflow);
 
+  const theme = getChartTheme();
   const option = {
     tooltip: {
       trigger: "axis",
@@ -477,9 +569,9 @@ function updateMonthlyChart() {
     xAxis: {
       type: "category",
       data: months,
-      axisLine: { lineStyle: { color: "#dddddd" } },
+      axisLine: { lineStyle: { color: theme.hairline } },
       axisLabel: {
-        color: "#6a6a6a",
+        color: theme.muted,
         fontSize: 10,
         interval: 0,
         formatter: (val) => val.includes("-") ? val.split("-").pop() : val
@@ -488,12 +580,12 @@ function updateMonthlyChart() {
     yAxis: [
       {
         type: "value",
-        axisLabel: { color: "#6a6a6a", fontSize: 10, formatter: formatK },
-        splitLine: { lineStyle: { color: "#ebebeb" } }
+        axisLabel: { color: theme.muted, fontSize: 10, formatter: formatK },
+        splitLine: { lineStyle: { color: theme.hairlineSoft } }
       },
       {
         type: "value",
-        axisLabel: { color: "#6a6a6a", fontSize: 10, formatter: formatK },
+        axisLabel: { color: theme.muted, fontSize: 10, formatter: formatK },
         splitLine: { show: false }
       }
     ],
@@ -503,7 +595,7 @@ function updateMonthlyChart() {
         type: "bar",
         data: inflow,
         yAxisIndex: 1,
-        itemStyle: { color: "#ff385c" },
+        itemStyle: { color: theme.rausch },
         stack: "flow",
         barWidth: 4
       },
@@ -512,7 +604,7 @@ function updateMonthlyChart() {
         type: "bar",
         data: outflow,
         yAxisIndex: 1,
-        itemStyle: { color: "rgba(34,34,34,0.35)" },
+        itemStyle: { color: theme.ink, opacity: 0.35 },
         stack: "flow",
         barWidth: 4
       },
@@ -521,7 +613,7 @@ function updateMonthlyChart() {
         type: "line",
         data: balances,
         smooth: true,
-        itemStyle: { color: "#222222" },
+        itemStyle: { color: theme.ink },
         lineStyle: { width: 2 }
       }
     ]
@@ -539,6 +631,7 @@ function updateDailyChart(slice) {
   const balanceMax = Math.max(...balances);
   const balancePad = Math.max((balanceMax - balanceMin) * 0.08, balanceMax * 0.002, 1);
 
+  const theme = getChartTheme();
   const option = {
     tooltip: {
       trigger: "axis",
@@ -558,8 +651,8 @@ function updateDailyChart(slice) {
     xAxis: {
       type: "category",
       data: dates,
-      axisLine: { lineStyle: { color: "#dddddd" } },
-      axisLabel: { color: "#6a6a6a" }
+      axisLine: { lineStyle: { color: theme.hairline } },
+      axisLabel: { color: theme.muted }
     },
     yAxis: [
       {
@@ -568,17 +661,17 @@ function updateDailyChart(slice) {
         max: Math.round((balanceMax + balancePad) * 100) / 100,
         scale: true,
         axisLabel: {
-          color: "#6a6a6a",
+          color: theme.muted,
           formatter: (val) => {
             const rounded = Math.round(val * 100) / 100;
             return formatK(rounded);
           }
         },
-        splitLine: { lineStyle: { color: "#ebebeb" } }
+        splitLine: { lineStyle: { color: theme.hairlineSoft } }
       },
       {
         type: "value",
-        axisLabel: { color: "#6a6a6a", formatter: formatK },
+        axisLabel: { color: theme.muted, formatter: formatK },
         splitLine: { show: false }
       }
     ],
@@ -588,7 +681,7 @@ function updateDailyChart(slice) {
         type: "bar",
         data: inflow,
         yAxisIndex: 1,
-        itemStyle: { color: "#ff385c" },
+        itemStyle: { color: theme.rausch },
         stack: "daily",
         barMaxWidth: 6
       },
@@ -597,7 +690,7 @@ function updateDailyChart(slice) {
         type: "bar",
         data: outflow,
         yAxisIndex: 1,
-        itemStyle: { color: "rgba(34,34,34,0.35)" },
+        itemStyle: { color: theme.ink, opacity: 0.35 },
         stack: "daily",
         barMaxWidth: 18
       },
@@ -606,7 +699,7 @@ function updateDailyChart(slice) {
         type: "line",
         data: balances,
         smooth: true,
-        itemStyle: { color: "#222222" },
+        itemStyle: { color: theme.ink },
         lineStyle: { width: 2 }
       }
     ]
@@ -685,6 +778,8 @@ function updateSankey() {
         data,
         links,
         emphasis: { focus: "adjacency" },
+        label: { color: getChartTheme().ink },
+        edgeLabel: { color: getChartTheme().muted },
         lineStyle: { color: "gradient", curveness: 0.5 },
         itemStyle: { borderWidth: 0 },
         nodeAlign: "justify",
@@ -891,7 +986,8 @@ function openCategoryDetail(category, categoryType) {
     { label: "Transactions", value: String(transactions.length) },
     { label: "Total amount", value: formatMoney(total) }
   ]);
-  dom.detailFilters.style.display = "none";
+  dom.detailFilters.style.display = "flex";
+  syncDetailFilters();
   dom.detailSort.value = state.detail.sort;
   renderDetailList();
   openDetailModal();
@@ -943,7 +1039,8 @@ function getDetailTransactions() {
     const range = getRange(series);
     filtered = filtered
       .filter((item) => item.category === state.detail.category)
-      .filter((item) => item.date >= range.startDate && item.date <= range.endDate);
+      .filter((item) => item.date >= range.startDate && item.date <= range.endDate)
+      .filter((item) => state.detail.filters[item.type]);
   }
 
   if (state.detail.sort === "amount") {
@@ -956,9 +1053,12 @@ function getDetailTransactions() {
 }
 
 function syncDetailFilters() {
-  dom.detailFilters.querySelectorAll(".filter-chip").forEach((chip) => {
-    const filter = chip.dataset.filter;
-    chip.classList.toggle("is-active", state.detail.filters[filter]);
+  syncFilterButtons(state.detail.filters, dom.detailFilters);
+}
+
+function syncFilterButtons(filters, container) {
+  container.querySelectorAll(".filter-chip").forEach((chip) => {
+    chip.classList.toggle("is-active", filters[chip.dataset.filter]);
   });
 }
 
