@@ -63,6 +63,11 @@
 - Parser prompt now includes currency legend and enforces supported currency selection; default currency is not passed to AI.
 - Balance checks and refund/transfer detection updated to run per PDF per currency.
 
+## 2026-05-13
+- Added `currency_iso` to `currency.json` for ISO 4217 mapping.
+- Added `fx_rate.json` schema to [docs/schema.md](docs/schema.md).
+- Created `src/backend/fetch_fx.py` to fetch Frankfurter rates and build full FX matrix.
+
 ## Plan
 
 - [x] Implement src/backend/processor.py to generate UI JSON files.

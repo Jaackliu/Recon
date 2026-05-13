@@ -16,8 +16,22 @@
 | 字段名 | 键名 (Key) | 数据类型 | 说明 / 约束 |
 | :--- | :--- | :--- | :--- |
 | **货币代码** | `currency_code` | String | **主键**。两位数字字符串（例："01"），全系统唯一。 |
+| **ISO 货币代码** | `currency_iso` | String | ISO 4217 三位大写字母（例："CNY"），用于汇率获取与跨系统对接。 |
 | **货币名称** | `currency_name` | String | 用于 AI API 识别（例："人民币"、"美元"、"港币"）。 |
 | **货币符号** | `currency_symbol` | String | 用于前端显示（例："￥"、"$"、"HK$"）。 |
+
+### 1.1 `fx_rate.json` (汇率矩阵)
+本文件由 `fetch_fx.py` 生成，记录 `currency.json` 中所有币种之间的全量汇率矩阵，便于后续跨币种计算。
+
+结构为 JSON 对象，包含以下字段：
+
+| 字段名 | 键名 (Key) | 数据类型 | 说明 / 约束 |
+| :--- | :--- | :--- | :--- |
+| **数据日期** | `as_of` | String | 汇率日期，格式 `YYYY-MM-DD`。 |
+| **数据来源** | `source` | String | 数据源名称（例："Frankfurter (ECB)"）。 |
+| **查询基准币种** | `base_iso` | String | 请求第三方汇率接口时所用的 ISO 基准币种。 |
+| **货币清单** | `currencies` | Array[Object] | 与 `currency.json` 一致的币种清单，每个对象必须包含 `currency_code`、`currency_iso`、`currency_name`、`currency_symbol`。 |
+| **汇率矩阵** | `rates` | Object | 以 `currency_code` 为键的嵌套对象。`rates[A][B]` 表示 A→B 的汇率，**必须包含所有币种两两组合**，同币种汇率为 `1.0`，数值为四舍五入保留 6 位小数的 Float。 |
 
 ### 2. `accounts.json` (银行账户配置)
 本文件由人工手动维护（后端手动新增，前端与 AI API 无权新增）。AI API 解析账单时必须引入此文件作为 Prompt 上下文，以确保识别出的账户代码完全合法。

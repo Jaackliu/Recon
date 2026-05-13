@@ -9,7 +9,7 @@
 
 ## 一、 `processor.py` 处理管线 (Processing Pipeline)
 
-`processor.py` 在每次 `parser.py` 更新 `transactions.json` 后自动运行，执行以下四个核心阶段：
+`processor.py` 在每次 `parser.py` 更新 `transactions.json` 后手动运行，执行以下四个核心阶段：
 
 ### 1. 时间轴对齐与状态前向填充 (Forward-Fill)
 银行交易是不连续的（某天可能无交易），但前端曲线图要求每日都有数据。
