@@ -543,7 +543,8 @@ input {
 .cashflow-card,
 .heatmap-card,
 .monthly-card {
-  min-height: 150px;
+  height: 230px;
+  overflow: hidden;
 }
 
 .heatmap-card {
@@ -621,6 +622,9 @@ input {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .account-row {
@@ -678,7 +682,7 @@ input {
 
 .heatmap-card .chart,
 .monthly-card .chart {
-  height: 160px;
+  height: 140px;
 }
 
 .monthly-card .chart,

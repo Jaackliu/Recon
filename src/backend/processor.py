@@ -682,6 +682,11 @@ def main() -> None:
 
     currency_breakdown = local_dataset.get("currency_breakdown")
 
+    meta = {"processor_default_currency": global_default_currency}
+    daily_series_by_currency["_meta"] = meta
+    static_charts_by_currency["_meta"] = meta
+    transactions_by_currency["_meta"] = meta
+
     write_json(ui_dir / "ui_daily_series.json", daily_series_by_currency)
     write_json(ui_dir / "ui_static_charts.json", static_charts_by_currency)
     write_json(ui_dir / "ui_transactions_and_categories.json", transactions_by_currency)

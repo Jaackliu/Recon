@@ -4,7 +4,8 @@ const DATA_PATHS = {
   dailySeries: "../../data/ui/ui_daily_series.json",
   staticCharts: "../../data/ui/ui_static_charts.json",
   transactions: "../../data/ui/ui_transactions_and_categories.json",
-  currencyBreakdown: "../../data/ui/ui_currency_breakdown.json"
+  currencyBreakdown: "../../data/ui/ui_currency_breakdown.json",
+  fxRates: "../../data/database/fx_rate.json"
 };
 
 const state = {
@@ -44,7 +45,8 @@ const state = {
     dailySeries: {},
     staticCharts: {},
     transactions: {},
-    currencyBreakdown: {}
+    currencyBreakdown: {},
+    fxRates: {}
   },
   charts: {}
 };
@@ -202,13 +204,14 @@ document.addEventListener("click", (event) => {
 async function init() {
   try {
     applyTheme(state.theme);
-    const [accounts, currencies, dailySeries, staticCharts, transactions, currencyBreakdown] = await Promise.all([
+    const [accounts, currencies, dailySeries, staticCharts, transactions, currencyBreakdown, fxRates] = await Promise.all([
       fetchJson(DATA_PATHS.accounts),
       fetchJson(DATA_PATHS.currencies),
       fetchJson(DATA_PATHS.dailySeries),
       fetchJson(DATA_PATHS.staticCharts),
       fetchJson(DATA_PATHS.transactions),
-      fetchJson(DATA_PATHS.currencyBreakdown).catch(() => ({}))
+      fetchJson(DATA_PATHS.currencyBreakdown).catch(() => ({})),
+      fetchJson(DATA_PATHS.fxRates).catch(() => ({ rates: {} }))
     ]);
 
     state.data.accounts = accounts;
@@ -217,6 +220,7 @@ async function init() {
     state.data.staticCharts = staticCharts;
     state.data.transactions = transactions;
     state.data.currencyBreakdown = currencyBreakdown;
+    state.data.fxRates = fxRates.rates || {};
 
     buildAccountList();
     bindEvents();
@@ -1243,7 +1247,11 @@ function getCurrencyBreakdownForAccount(code) {
 
 function getDataset(collection) {
   const key = getActiveDatasetKey();
-  return collection[key] || {};
+  const raw = collection[key] || {};
+  if (key === "default") {
+    return applyGlobalCurrencyConversion(raw, collection);
+  }
+  return raw;
 }
 
 function getActiveDatasetKey() {
@@ -1251,6 +1259,76 @@ function getActiveDatasetKey() {
     return state.account === "total" ? "default" : "default_local";
   }
   return state.currency;
+}
+
+function getProcessorDefaultCurrency(collection) {
+  const meta = collection._meta;
+  if (meta && meta.processor_default_currency) return meta.processor_default_currency;
+  return getFallbackCurrencyCode();
+}
+
+function getUserDefaultCurrency() {
+  return localStorage.getItem("defaultCurrency") || getFallbackCurrencyCode();
+}
+
+function getFxRate(fromCode, toCode) {
+  if (fromCode === toCode) return 1;
+  const rates = state.data.fxRates;
+  if (rates[fromCode] && rates[fromCode][toCode] !== undefined) {
+    return rates[fromCode][toCode];
+  }
+  return 1;
+}
+
+const conversionCache = new WeakMap();
+
+function applyGlobalCurrencyConversion(dataset, collection) {
+  const processorCurrency = getProcessorDefaultCurrency(collection);
+  const userCurrency = getUserDefaultCurrency();
+  if (processorCurrency === userCurrency) return dataset;
+  const rate = getFxRate(processorCurrency, userCurrency);
+  if (rate === 1) return dataset;
+  const rateKey = `${processorCurrency}:${userCurrency}:${rate}`;
+  let cache = conversionCache.get(collection);
+  if (cache && cache.key === rateKey) return cache.result;
+  const converted = convertDataset(dataset, rate);
+  conversionCache.set(collection, { key: rateKey, result: converted });
+  return converted;
+}
+
+function convertDataset(dataset, rate) {
+  const result = {};
+  for (const key of Object.keys(dataset)) {
+    result[key] = convertValue(dataset[key], rate);
+  }
+  return result;
+}
+
+const AMOUNT_KEYS = new Set([
+  "start_balance", "end_balance",
+  "all_inflow", "all_outflow", "net_internal_transfer",
+  "filtered_inflow", "filtered_outflow",
+  "amount", "inflow", "outflow", "net_inflow"
+]);
+
+function convertValue(value, rate) {
+  if (Array.isArray(value)) {
+    return value.map((item) => convertValue(item, rate));
+  }
+  if (typeof value === "object" && value !== null) {
+    const out = {};
+    for (const [k, v] of Object.entries(value)) {
+      if (AMOUNT_KEYS.has(k) && typeof v === "number") {
+        out[k] = round2(v * rate);
+      } else if (typeof v === "object" && v !== null) {
+        out[k] = convertValue(v, rate);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+  return value;
 }
 
 function getRange(series) {
@@ -1391,11 +1469,11 @@ function sumValues(map) {
   return round2(Object.values(map).reduce((sum, value) => sum + value, 0));
 }
 
-function formatMoney(value) {
+function formatMoney(value, currencyCode) {
   const amount = Number(value) || 0;
   const sign = amount < 0 ? "-" : "";
-  const currencyCode = getActiveCurrencyCode();
-  const symbol = getCurrencySymbol(currencyCode);
+  const code = currencyCode || getActiveCurrencyCode();
+  const symbol = getCurrencySymbol(code);
   return `${sign}${symbol}${Math.abs(amount).toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2

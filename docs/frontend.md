@@ -71,8 +71,8 @@
     *   **默认货币选择 (Default Currency)**：显示所有可用货币选项，使用 `currency.json` 的 `currency_symbol` 和 `currency_name` 展示。
 *   **数据持久化**：
     *   主题设置保存到 `localStorage` 的 `theme` 键。
-    *   默认货币设置保存到 `localStorage` 的 `defaultCurrency` 键，并同时更新内存中的 `state.data.settings.global_default_currency`。
-*   **默认币种语义**：设置的默认货币将用于”总资产 + 默认”视图的货币视角。
+    *   默认货币设置保存到 `localStorage` 的 `defaultCurrency` 键。
+*   **默认币种语义**：设置的默认货币将用于”总资产 + 默认”视图的货币视角。前端加载 `fx_rate.json` 并读取 UI JSON 中的 `_meta.processor_default_currency`，当用户选择的默认货币与处理器默认货币不同时，自动对 `”default”` 数据集进行运行时汇率转换。
 
 ---
 

@@ -47,7 +47,7 @@
 
 ## 二、 核心中间 JSON 数据模型 (Intermediate Schemas)
 
-所有由 `processor.py` 生成的 JSON 文件均放在 `data/ui/` 目录下。
+所有由 `processor.py` 生成的 JSON 文件均放在 `data/ui/` 目录下。每个文件包含一个顶层 `_meta` 字段，记录 `processor_default_currency`（处理器使用的全局默认币种代码），供前端在运行时进行汇率转换。
 
 ### 1. `ui_static_charts.json` (静态全局视图)
 专供不受前端时间范围调节器影响的 **C (每日热力图)** 和 **D (月度余额组合图)** 使用。现金流相关金额基于 `all_inflow` / `all_outflow` 计算，包含所有 `type_code`。
