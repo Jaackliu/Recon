@@ -255,7 +255,29 @@ def build_converted_daily_series(
         else:
             daily_series[account_code] = []
 
-    return daily_series
+    currency_breakdown: Dict[str, List[Dict[str, Any]]] = {}
+    for account_code in account_codes:
+        target_currency = account_targets.get(account_code, "")
+        rows: List[Dict[str, Any]] = []
+        for source_currency, series in grouped.get(account_code, {}).items():
+            normalized = normalize_transactions(
+                [
+                    {**tx, "amount": float(tx["amount"]) * get_fx_rate(fx_rates, tx.get("currency", ""), target_currency, logger), "balance": float(tx["balance"]) * get_fx_rate(fx_rates, tx.get("currency", ""), target_currency, logger)}
+                    for tx in series
+                ]
+            )
+            if not normalized:
+                continue
+            last_entry = normalized[-1]
+            rows.append({
+                "currency": source_currency,
+                "end_balance": round_money(float(last_entry["balance"])),
+            })
+        if rows:
+            rows.sort(key=lambda r: abs(r["end_balance"]), reverse=True)
+            currency_breakdown[account_code] = rows
+
+    return daily_series, currency_breakdown
 
 
 def build_daily_series(
@@ -508,8 +530,9 @@ def build_dataset(
     transactions = normalize_transactions(prepared)
     transactions_by_account = group_by_account(transactions)
 
+    currency_breakdown: Optional[Dict[str, List[Dict[str, Any]]]] = None
     if account_targets and fx_rates and not filter_currency:
-        daily_series = build_converted_daily_series(
+        daily_series, currency_breakdown = build_converted_daily_series(
             transactions_raw,
             account_codes,
             logger,
@@ -543,6 +566,7 @@ def build_dataset(
         "daily_series": daily_series,
         "static_charts": static_charts,
         "transactions": transactions_output,
+        "currency_breakdown": currency_breakdown,
     }
 
 
@@ -656,9 +680,13 @@ def main() -> None:
         static_charts_by_currency[currency_code] = filtered_dataset["static_charts"]
         transactions_by_currency[currency_code] = filtered_dataset["transactions"]
 
+    currency_breakdown = local_dataset.get("currency_breakdown")
+
     write_json(ui_dir / "ui_daily_series.json", daily_series_by_currency)
     write_json(ui_dir / "ui_static_charts.json", static_charts_by_currency)
     write_json(ui_dir / "ui_transactions_and_categories.json", transactions_by_currency)
+    if currency_breakdown is not None:
+        write_json(ui_dir / "ui_currency_breakdown.json", currency_breakdown)
 
     logger.info("Generated UI data: %s", ui_dir)
 

@@ -164,7 +164,22 @@
 * **计算当前余额**：选取截取后数组的最后一个元素 `end_balance`。
 * **计算环比**：依据当期 `end_balance` 与往前推同等天数位置的 `end_balance` 相比。
 
-### 3. `ui_transactions_and_categories.json` (明细与分类池)
+### 3. `ui_currency_breakdown.json` (账户多币种余额明细)
+
+专供 **A (余额概览)** 在"特定账户 + 默认货币"场景下使用。提供每个账户按原始币种分拆的最终余额（已转换为账户 `default_currency`），按余额绝对值降序排列。
+
+```json
+{
+  "001": [
+    { "currency": "01", "end_balance": 50000.00 },
+    { "currency": "02", "end_balance": 12000.50 }
+  ]
+}
+```
+
+**生成条件**：仅在 `default_local` 数据集构建时产出（即使用 `local_targets` 的账户默认货币汇率转换场景），其余场景不生成此文件。
+
+### 4. `ui_transactions_and_categories.json` (明细与分类池)
 
 专供 **F (桑基图)**、**G (分类占比与排行)** 以及 **Transactions 列表页** 使用。由于分类的图表必须依据自定义时间范围实时重绘，后端需提供一个清洗后、附带所属类别的列表，以便前端极速求和聚合。
 *   **现金流方向**：每条交易必须包含 `cashflow_direction`，供 Transactions 列表页决定金额正负。

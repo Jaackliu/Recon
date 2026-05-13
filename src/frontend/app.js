@@ -1,10 +1,10 @@
 const DATA_PATHS = {
   accounts: "../../data/database/accounts.json",
   currencies: "../../data/database/currency.json",
-  settings: "../../settings.json",
   dailySeries: "../../data/ui/ui_daily_series.json",
   staticCharts: "../../data/ui/ui_static_charts.json",
-  transactions: "../../data/ui/ui_transactions_and_categories.json"
+  transactions: "../../data/ui/ui_transactions_and_categories.json",
+  currencyBreakdown: "../../data/ui/ui_currency_breakdown.json"
 };
 
 const state = {
@@ -12,7 +12,7 @@ const state = {
   account: null,
   currency: "default",
   theme: localStorage.getItem("theme") || "system",
-  rangeMode: "30",
+  rangeMode: "90",
   customRange: {
     start: "",
     end: ""
@@ -41,10 +41,10 @@ const state = {
   data: {
     accounts: [],
     currencies: [],
-    settings: {},
     dailySeries: {},
     staticCharts: {},
-    transactions: {}
+    transactions: {},
+    currencyBreakdown: {}
   },
   charts: {}
 };
@@ -89,7 +89,10 @@ const dom = {
   detailList: document.getElementById("detailList"),
   detailClose: document.getElementById("detailClose"),
   toast: document.getElementById("toast"),
-  themeButtons: document.getElementById("themeButtons")
+  settingsButton: document.getElementById("settingsButton"),
+  settingsModal: document.getElementById("settingsModal"),
+  closeSettingsModal: document.getElementById("closeSettingsModal"),
+  currencySelector: document.getElementById("currencySelector")
 };
 
 const palette = ["#ff385c", "#ff8b5a", "#f5c542", "#33b28a", "#2f80ed", "#222222", "#ff9aa7"];
@@ -132,30 +135,88 @@ function reinitCharts() {
   updateAll();
 }
 
-function setActiveThemeButton() {
-  document.querySelectorAll(".theme-buttons .pill").forEach((pill) => {
-    pill.classList.toggle("is-active", pill.dataset.theme === state.theme);
+function setActiveThemeOption() {
+  document.querySelectorAll(".theme-option").forEach((option) => {
+    option.classList.toggle("is-active", option.dataset.theme === state.theme);
   });
 }
+
+function openSettingsModal() {
+  dom.settingsModal.classList.add("is-open");
+  dom.settingsModal.setAttribute("aria-hidden", "false");
+  buildCurrencySelector();
+  setActiveThemeOption();
+}
+
+function closeSettingsModal() {
+  dom.settingsModal.classList.remove("is-open");
+  dom.settingsModal.setAttribute("aria-hidden", "true");
+}
+
+function buildCurrencySelector() {
+  if (!dom.currencySelector) return;
+
+  const savedCurrency = localStorage.getItem("defaultCurrency") || "01";
+
+  dom.currencySelector.innerHTML = "";
+  state.data.currencies.forEach((currency) => {
+    const button = document.createElement("button");
+    button.className = "currency-option";
+    button.dataset.currency = currency.currency_code;
+    button.innerHTML = `<span class="currency-symbol">${escapeHtml(currency.currency_symbol)}</span><span class="currency-name">${escapeHtml(currency.currency_name)}</span>`;
+    button.addEventListener("click", () => {
+      selectDefaultCurrency(currency.currency_code);
+    });
+    dom.currencySelector.appendChild(button);
+  });
+
+  dom.currencySelector.querySelectorAll(".currency-option").forEach((option) => {
+    option.classList.toggle("is-active", option.dataset.currency === savedCurrency);
+  });
+}
+
+function selectDefaultCurrency(currencyCode) {
+  localStorage.setItem("defaultCurrency", currencyCode);
+
+  dom.currencySelector.querySelectorAll(".currency-option").forEach((option) => {
+    option.classList.toggle("is-active", option.dataset.currency === currencyCode);
+  });
+
+  updateCurrencyOptions();
+  updateAll();
+  showToast("Default currency updated");
+}
+
+document.addEventListener("click", (event) => {
+  const themeOption = event.target.closest(".theme-option");
+  if (themeOption) {
+    const theme = themeOption.dataset.theme;
+    state.theme = theme;
+    localStorage.setItem("theme", theme);
+    applyTheme(theme);
+    setActiveThemeOption();
+    reinitCharts();
+  }
+});
 
 async function init() {
   try {
     applyTheme(state.theme);
-    const [accounts, currencies, settings, dailySeries, staticCharts, transactions] = await Promise.all([
+    const [accounts, currencies, dailySeries, staticCharts, transactions, currencyBreakdown] = await Promise.all([
       fetchJson(DATA_PATHS.accounts),
       fetchJson(DATA_PATHS.currencies),
-      fetchJson(DATA_PATHS.settings),
       fetchJson(DATA_PATHS.dailySeries),
       fetchJson(DATA_PATHS.staticCharts),
-      fetchJson(DATA_PATHS.transactions)
+      fetchJson(DATA_PATHS.transactions),
+      fetchJson(DATA_PATHS.currencyBreakdown).catch(() => ({}))
     ]);
 
     state.data.accounts = accounts;
     state.data.currencies = currencies;
-    state.data.settings = settings || {};
     state.data.dailySeries = dailySeries;
     state.data.staticCharts = staticCharts;
     state.data.transactions = transactions;
+    state.data.currencyBreakdown = currencyBreakdown;
 
     buildAccountList();
     bindEvents();
@@ -324,14 +385,12 @@ function bindEvents() {
     updateTransactionsView();
   });
 
-  dom.themeButtons.addEventListener("click", (event) => {
-    const button = event.target.closest(".pill");
-    if (!button) return;
-    state.theme = button.dataset.theme;
-    localStorage.setItem("theme", state.theme);
-    applyTheme(state.theme);
-    setActiveThemeButton();
-    reinitCharts();
+  dom.settingsButton.addEventListener("click", openSettingsModal);
+  dom.closeSettingsModal.addEventListener("click", closeSettingsModal);
+  dom.settingsModal.addEventListener("click", (event) => {
+    if (event.target === dom.settingsModal) {
+      closeSettingsModal();
+    }
   });
 
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
@@ -351,7 +410,7 @@ function setInitialSelections() {
   updateCurrencyOptions();
   setActiveRangeButton();
   setActiveCategoryToggle();
-  setActiveThemeButton();
+  setActiveThemeOption();
 }
 
 function setView(view) {
@@ -492,6 +551,18 @@ function updateBalanceOverview(series, slice, range) {
       row.innerHTML = `<span>${escapeHtml(account.alias || account.account_name)}</span><strong>${formatMoney(balanceAtDate.end_balance)}</strong>`;
       dom.accountBreakdown.appendChild(row);
     });
+  } else if (state.currency === "default") {
+    const breakdown = getCurrencyBreakdownForAccount(state.account);
+    if (breakdown && breakdown.length > 0) {
+      breakdown.forEach((item) => {
+        const currency = getCurrencyByCode(item.currency);
+        const name = currency ? currency.currency_name : item.currency;
+        const row = document.createElement("div");
+        row.className = "account-row";
+        row.innerHTML = `<span>${escapeHtml(name)}</span><strong>${formatMoney(item.end_balance)}</strong>`;
+        dom.accountBreakdown.appendChild(row);
+      });
+    }
   }
 }
 
@@ -1166,6 +1237,10 @@ function getStaticForAccount(code) {
   return dataset[code];
 }
 
+function getCurrencyBreakdownForAccount(code) {
+  return state.data.currencyBreakdown[code] || null;
+}
+
 function getDataset(collection) {
   const key = getActiveDatasetKey();
   return collection[key] || {};
@@ -1271,14 +1346,14 @@ function getActiveCurrencyCode() {
   if (state.currency !== "default") return state.currency;
 
   if (state.account === "total") {
-    return state.data.settings.global_default_currency || getFallbackCurrencyCode();
+    return localStorage.getItem("defaultCurrency") || getFallbackCurrencyCode();
   }
 
   const account = state.data.accounts.find((item) => item.account_code === state.account);
   if (account && account.default_currency) {
     return account.default_currency;
   }
-  return state.data.settings.global_default_currency || getFallbackCurrencyCode();
+  return localStorage.getItem("defaultCurrency") || getFallbackCurrencyCode();
 }
 
 function getFallbackCurrencyCode() {
