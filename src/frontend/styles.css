@@ -289,6 +289,12 @@ input {
   text-align: center;
 }
 
+.pill-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .range-info {
   font-size: 13px;
   color: var(--muted);

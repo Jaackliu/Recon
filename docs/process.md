@@ -11,6 +11,17 @@
 
 `processor.py` 在每次 `parser.py` 更新 `transactions.json` 后手动运行，执行以下四个核心阶段：
 
+### 0. 币种语义与汇率转换 (Multi-Currency Context)
+为了支持前端货币选择器，处理引擎必须提供两类数据视角：
+*   **默认币种视角 (Converted)**：
+  *   **单账户视角**：使用 `accounts.json` 的 `default_currency` 作为目标币种。
+  *   **总资产视角**：使用 `settings.json` 的 `global_default_currency` 作为目标币种。
+  *   所有其他币种的交易，全部依据 `fx_rate.json` 的矩阵汇率 **一次性转换** 为目标币种。
+  *   **余额与现金流汇总**：按币种分别生成每日序列并前向填充，再将所有币种的每日余额/现金流转换后求和，作为默认币种视角的每日结果。
+*   **指定币种视角 (Filtered)**：当选择具体币种时，仅保留 `transactions.json` 中 `currency` 等于所选币种的交易记录，**不做换算**。
+
+> 注意：汇率不考虑时间变化，统一使用 `fx_rate.json` 中的固定矩阵。
+
 ### 1. 时间轴对齐与状态前向填充 (Forward-Fill)
 银行交易是不连续的（某天可能无交易），但前端曲线图要求每日都有数据。
 *   **逻辑**：遍历 `transactions.json`，按日期升序排列。为每个 `account_code` 构建从第一笔交易日到系统当天的**连续每日历 (Dense Calendar)**。
@@ -27,7 +38,10 @@
 *   **净指标 (Filtered)**：严格排除 `type_code: 3` (撤销/报销) 和 `4` (内部转账)，但流入/流出方向仍以 `cashflow_direction` 为准。用于“F/G 分类类图表”。
 
 ### 4. 数据集市生成 (Data Mart Generation)
-将计算结果分拆并输出为以下三个高度优化的 JSON 文件，直接供前端 Fetch。
+将计算结果分拆并输出为以下三个高度优化的 JSON 文件，直接供前端 Fetch。三份文件均以**币种维度**为第一层 Key：
+*   `default`：**全局默认币种**视角（用于“总资产 + 默认币种”）。
+*   `default_local`：**单账户默认币种**视角（用于“特定账户 + 默认币种”，仅包含各账户自身，不包含 `total`）。
+*   具体币种代码（如 `01`、`02`）：**指定币种过滤视角**。
 
 ---
 
@@ -40,18 +54,51 @@
 
 ```json
 {
-  "total": {
-    "heatmap": [
-      { "date": "2023-10-01", "net_inflow": 1500.00 },
-      // ... 近 90 天数据，前端直接映射至 7x13 热力图网格
-    ],
-    "monthly_combo": [
-      { "month": "2023-10", "end_balance": 54000.00, "inflow": 12000.00, "outflow": 8000.00 },
-      // ... 近 12 个月数据
-    ]
+  "default": {
+    "total": {
+      "heatmap": [
+        { "date": "2023-10-01", "net_inflow": 1500.00 }
+      ],
+      "monthly_combo": [
+        { "month": "2023-10", "end_balance": 54000.00, "inflow": 12000.00, "outflow": 8000.00 }
+      ]
+    },
+    "001": {
+      "heatmap": [
+        { "date": "2023-10-01", "net_inflow": 120.00 }
+      ],
+      "monthly_combo": [
+        { "month": "2023-10", "end_balance": 3200.00, "inflow": 800.00, "outflow": 560.00 }
+      ]
+    }
   },
-  "001": {
-    // 结构同上，特定账户 001 的近90天热力与近12个月度数据
+  "default_local": {
+    "001": {
+      "heatmap": [
+        { "date": "2023-10-01", "net_inflow": 120.00 }
+      ],
+      "monthly_combo": [
+        { "month": "2023-10", "end_balance": 3200.00, "inflow": 800.00, "outflow": 560.00 }
+      ]
+    }
+  },
+  "01": {
+    "total": {
+      "heatmap": [
+        { "date": "2023-10-01", "net_inflow": 1500.00 }
+      ],
+      "monthly_combo": [
+        { "month": "2023-10", "end_balance": 54000.00, "inflow": 12000.00, "outflow": 8000.00 }
+      ]
+    },
+    "001": {
+      "heatmap": [
+        { "date": "2023-10-01", "net_inflow": 120.00 }
+      ],
+      "monthly_combo": [
+        { "month": "2023-10", "end_balance": 3200.00, "inflow": 800.00, "outflow": 560.00 }
+      ]
+    }
   }
 }
 
@@ -65,23 +112,48 @@
 
 ```json
 {
-  "total": [
-    {
-      "date": "2023-10-01",
-      "start_balance": 50000.00,       // 当日初余额 (用于计算 B 的比例)
-      "end_balance": 50500.00,         // 当日末余额 (用于 A 当前余额、E 的折线)
-      
-      // --- 全量指标 (用于 B 现金流计算) ---
-      "all_inflow": 2000.00,           // 包含撤销与转账在内的所有流入 (方向以 cashflow_direction 为准)
-      "all_outflow": -1500.00,         // 包含撤销与转账在内的所有流出 (方向以 cashflow_direction 为准)
-      "net_internal_transfer": 500.00, // 仅类型 4 的流入 - 类型 4 的流出 (方向以 cashflow_direction 为准)
-
-      // --- 净指标 (用于 E 的柱状图) ---
-      "filtered_inflow": 1000.00,      // 排除类型 3、4 的流入 (方向以 cashflow_direction 为准)
-      "filtered_outflow": -500.00      // 排除类型 3、4 的流出 (方向以 cashflow_direction 为准)
-    },
-    // ... 一直到系统当天
-  ]
+  "default": {
+    "total": [
+      {
+        "date": "2023-10-01",
+        "start_balance": 50000.00,
+        "end_balance": 50500.00,
+        "all_inflow": 2000.00,
+        "all_outflow": -1500.00,
+        "net_internal_transfer": 500.00,
+        "filtered_inflow": 1000.00,
+        "filtered_outflow": -500.00
+      }
+    ]
+  },
+  "default_local": {
+    "001": [
+      {
+        "date": "2023-10-01",
+        "start_balance": 8000.00,
+        "end_balance": 8200.00,
+        "all_inflow": 400.00,
+        "all_outflow": -200.00,
+        "net_internal_transfer": 0.00,
+        "filtered_inflow": 300.00,
+        "filtered_outflow": -100.00
+      }
+    ]
+  },
+  "01": {
+    "total": [
+      {
+        "date": "2023-10-01",
+        "start_balance": 50000.00,
+        "end_balance": 50500.00,
+        "all_inflow": 2000.00,
+        "all_outflow": -1500.00,
+        "net_internal_transfer": 500.00,
+        "filtered_inflow": 1000.00,
+        "filtered_outflow": -500.00
+      }
+    ]
+  }
 }
 
 ```
@@ -99,20 +171,53 @@
 
 ```json
 {
-  "total": {
-    "transactions": [
-      {
-        "id": "TX-001-20231001-001",
-        "date": "2023-10-01",
-        "type": "expense",             // 映射后的直观文本 (income/expense/refund/transfer)
-        "is_filtered": true,           // true 表示类型为 1 或 2，前端画图只统计为 true 的条目
-        "category": "餐饮",
-        "amount": 45.50,
-        "cashflow_direction": 2,
-        "description": "麦当劳"
-      }
-      // ...
-    ]
+  "default": {
+    "total": {
+      "transactions": [
+        {
+          "id": "TX-001-20231001-001",
+          "date": "2023-10-01",
+          "type": "expense",
+          "is_filtered": true,
+          "category": "餐饮",
+          "amount": 45.50,
+          "cashflow_direction": 2,
+          "description": "麦当劳"
+        }
+      ]
+    }
+  },
+  "default_local": {
+    "001": {
+      "transactions": [
+        {
+          "id": "TX-001-20231001-001",
+          "date": "2023-10-01",
+          "type": "expense",
+          "is_filtered": true,
+          "category": "餐饮",
+          "amount": 45.50,
+          "cashflow_direction": 2,
+          "description": "麦当劳"
+        }
+      ]
+    }
+  },
+  "01": {
+    "total": {
+      "transactions": [
+        {
+          "id": "TX-001-20231001-001",
+          "date": "2023-10-01",
+          "type": "expense",
+          "is_filtered": true,
+          "category": "餐饮",
+          "amount": 45.50,
+          "cashflow_direction": 2,
+          "description": "麦当劳"
+        }
+      ]
+    }
   }
 }
 

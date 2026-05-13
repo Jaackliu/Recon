@@ -1,5 +1,7 @@
 const DATA_PATHS = {
   accounts: "../../data/database/accounts.json",
+  currencies: "../../data/database/currency.json",
+  settings: "../../settings.json",
   dailySeries: "../../data/ui/ui_daily_series.json",
   staticCharts: "../../data/ui/ui_static_charts.json",
   transactions: "../../data/ui/ui_transactions_and_categories.json"
@@ -8,6 +10,7 @@ const DATA_PATHS = {
 const state = {
   view: "dashboard",
   account: null,
+  currency: "default",
   theme: localStorage.getItem("theme") || "system",
   rangeMode: "30",
   customRange: {
@@ -37,6 +40,8 @@ const state = {
   },
   data: {
     accounts: [],
+    currencies: [],
+    settings: {},
     dailySeries: {},
     staticCharts: {},
     transactions: {}
@@ -46,6 +51,7 @@ const state = {
 
 const dom = {
   accountList: document.getElementById("accountList"),
+  currencyList: document.getElementById("currencyList"),
   rangeButtons: document.getElementById("rangeButtons"),
   rangeInfo: document.getElementById("rangeInfo"),
   rangeSummary: document.getElementById("rangeSummary"),
@@ -135,14 +141,18 @@ function setActiveThemeButton() {
 async function init() {
   try {
     applyTheme(state.theme);
-    const [accounts, dailySeries, staticCharts, transactions] = await Promise.all([
+    const [accounts, currencies, settings, dailySeries, staticCharts, transactions] = await Promise.all([
       fetchJson(DATA_PATHS.accounts),
+      fetchJson(DATA_PATHS.currencies),
+      fetchJson(DATA_PATHS.settings),
       fetchJson(DATA_PATHS.dailySeries),
       fetchJson(DATA_PATHS.staticCharts),
       fetchJson(DATA_PATHS.transactions)
     ]);
 
     state.data.accounts = accounts;
+    state.data.currencies = currencies;
+    state.data.settings = settings || {};
     state.data.dailySeries = dailySeries;
     state.data.staticCharts = staticCharts;
     state.data.transactions = transactions;
@@ -169,15 +179,10 @@ function fetchJson(path) {
 }
 
 function buildAccountList() {
-  const list = [];
-  if (state.data.dailySeries.total) {
-    list.push({ code: "total", label: "Total Asset" });
-  }
+  const list = [{ code: "total", label: "Total Asset" }];
 
   state.data.accounts.forEach((account) => {
-    if (state.data.dailySeries[account.account_code]) {
-      list.push({ code: account.account_code, label: account.alias || account.account_name });
-    }
+    list.push({ code: account.account_code, label: account.alias || account.account_name });
   });
 
   dom.accountList.innerHTML = "";
@@ -205,8 +210,17 @@ function bindEvents() {
     const button = event.target.closest(".account-pill");
     if (!button) return;
     state.account = button.dataset.account;
-    updateAll();
     setActiveAccount();
+    updateCurrencyOptions();
+    updateAll();
+  });
+
+  dom.currencyList.addEventListener("click", (event) => {
+    const button = event.target.closest(".pill");
+    if (!button) return;
+    state.currency = button.dataset.currency;
+    setActiveCurrency();
+    updateAll();
   });
 
   dom.rangeButtons.addEventListener("click", (event) => {
@@ -334,6 +348,7 @@ function bindEvents() {
 
 function setInitialSelections() {
   setActiveAccount();
+  updateCurrencyOptions();
   setActiveRangeButton();
   setActiveCategoryToggle();
   setActiveThemeButton();
@@ -367,6 +382,40 @@ function setActiveRangeButton() {
 function setActiveCategoryToggle() {
   document.querySelectorAll(".toggle-btn").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.type === state.categoryType);
+  });
+}
+
+function updateCurrencyOptions() {
+  if (!dom.currencyList) return;
+  const available = getAvailableCurrencies(state.account);
+  const options = [
+    { value: "default", label: "Default" },
+    ...available.map((code) => {
+      const currency = getCurrencyByCode(code);
+      return { value: code, label: currency ? currency.currency_name : code };
+    })
+  ];
+
+  dom.currencyList.innerHTML = "";
+  options.forEach((option) => {
+    const item = document.createElement("button");
+    item.className = "pill";
+    item.dataset.currency = option.value;
+    item.textContent = option.label;
+    dom.currencyList.appendChild(item);
+  });
+
+  const isAllowed = options.some((option) => option.value === state.currency);
+  if (!isAllowed) {
+    state.currency = "default";
+  }
+  setActiveCurrency();
+}
+
+function setActiveCurrency() {
+  if (!dom.currencyList) return;
+  dom.currencyList.querySelectorAll(".pill").forEach((pill) => {
+    pill.classList.toggle("is-active", pill.dataset.currency === state.currency);
   });
 }
 
@@ -472,7 +521,7 @@ function percentile(arr, p) {
 }
 
 function updateHeatmap() {
-  const staticData = state.data.staticCharts[state.account];
+  const staticData = getStaticForAccount(state.account);
   if (!staticData || !staticData.heatmap || staticData.heatmap.length === 0) return;
 
   const data = staticData.heatmap.map((entry) => [entry.date, entry.net_inflow]);
@@ -540,7 +589,7 @@ function updateHeatmap() {
 }
 
 function updateMonthlyChart() {
-  const staticData = state.data.staticCharts[state.account];
+  const staticData = getStaticForAccount(state.account);
   if (!staticData || !staticData.monthly_combo) return;
 
   const months = staticData.monthly_combo.map((entry) => entry.month);
@@ -1103,11 +1152,30 @@ function toIsoDate(date) {
 }
 
 function getSeriesForAccount(code) {
-  return state.data.dailySeries[code];
+  const dataset = getDataset(state.data.dailySeries);
+  return dataset[code];
 }
 
 function getTransactionsForAccount(code) {
-  return (state.data.transactions[code] && state.data.transactions[code].transactions) || [];
+  const dataset = getDataset(state.data.transactions);
+  return (dataset[code] && dataset[code].transactions) || [];
+}
+
+function getStaticForAccount(code) {
+  const dataset = getDataset(state.data.staticCharts);
+  return dataset[code];
+}
+
+function getDataset(collection) {
+  const key = getActiveDatasetKey();
+  return collection[key] || {};
+}
+
+function getActiveDatasetKey() {
+  if (state.currency === "default") {
+    return state.account === "total" ? "default" : "default_local";
+  }
+  return state.currency;
 }
 
 function getRange(series) {
@@ -1186,6 +1254,49 @@ function getAccountLabel(code) {
   return account ? account.alias || account.account_name : code;
 }
 
+function getAvailableCurrencies(accountCode) {
+  if (accountCode === "total") {
+    const union = new Set();
+    state.data.accounts.forEach((account) => {
+      (account.supported_currencies || []).forEach((code) => union.add(code));
+    });
+    return Array.from(union).sort();
+  }
+
+  const account = state.data.accounts.find((item) => item.account_code === accountCode);
+  return account ? (account.supported_currencies || []) : [];
+}
+
+function getActiveCurrencyCode() {
+  if (state.currency !== "default") return state.currency;
+
+  if (state.account === "total") {
+    return state.data.settings.global_default_currency || getFallbackCurrencyCode();
+  }
+
+  const account = state.data.accounts.find((item) => item.account_code === state.account);
+  if (account && account.default_currency) {
+    return account.default_currency;
+  }
+  return state.data.settings.global_default_currency || getFallbackCurrencyCode();
+}
+
+function getFallbackCurrencyCode() {
+  if (state.data.currencies.length > 0) {
+    return state.data.currencies[0].currency_code;
+  }
+  return "01";
+}
+
+function getCurrencyByCode(code) {
+  return state.data.currencies.find((item) => item.currency_code === code);
+}
+
+function getCurrencySymbol(code) {
+  const currency = getCurrencyByCode(code);
+  return currency ? currency.currency_symbol : "¥";
+}
+
 function round2(n) {
   return Math.round(n * 100) / 100;
 }
@@ -1208,7 +1319,9 @@ function sumValues(map) {
 function formatMoney(value) {
   const amount = Number(value) || 0;
   const sign = amount < 0 ? "-" : "";
-  return `${sign}¥${Math.abs(amount).toLocaleString("en-US", {
+  const currencyCode = getActiveCurrencyCode();
+  const symbol = getCurrencySymbol(currencyCode);
+  return `${sign}${symbol}${Math.abs(amount).toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   })}`;

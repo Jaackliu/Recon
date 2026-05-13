@@ -17,6 +17,8 @@ TYPE_LABELS = {
 
 FILTERED_TYPE_CODES = {1, 2}
 INTERNAL_TRANSFER_CODE = 4
+DEFAULT_DATASET_KEY = "default"
+DEFAULT_LOCAL_KEY = "default_local"
 
 
 def round_money(value: float) -> float:
@@ -24,6 +26,25 @@ def round_money(value: float) -> float:
     if abs(rounded) < 0.005:
         return 0.0
     return rounded
+
+
+def get_fx_rate(
+    rates: Dict[str, Dict[str, float]],
+    source_currency: str,
+    target_currency: str,
+    logger: logging.Logger,
+) -> float:
+    if source_currency == target_currency:
+        return 1.0
+    try:
+        return float(rates[source_currency][target_currency])
+    except KeyError:
+        logger.error(
+            "Missing fx rate: %s -> %s",
+            source_currency,
+            target_currency,
+        )
+        return 1.0
 
 
 def parse_date(value: str) -> datetime.date:
@@ -103,6 +124,47 @@ def normalize_transactions(transactions: List[Dict[str, Any]]) -> List[Dict[str,
     return normalized
 
 
+def prepare_transactions(
+    transactions: List[Dict[str, Any]],
+    logger: logging.Logger,
+    account_targets: Optional[Dict[str, str]] = None,
+    filter_currency: Optional[str] = None,
+    fx_rates: Optional[Dict[str, Dict[str, float]]] = None,
+) -> List[Dict[str, Any]]:
+    prepared: List[Dict[str, Any]] = []
+
+    for tx in transactions:
+        if filter_currency:
+            if tx.get("currency") != filter_currency:
+                continue
+            prepared.append(dict(tx))
+            continue
+
+        if account_targets is None or fx_rates is None:
+            logger.error("Missing currency conversion settings.")
+            return []
+
+        account_code = tx.get("account_code")
+        target_currency = account_targets.get(account_code)
+        if not target_currency:
+            logger.warning("Missing target currency for account: %s", account_code)
+            continue
+
+        source_currency = tx.get("currency")
+        if not source_currency:
+            logger.warning("Missing source currency for transaction: %s", tx.get("transaction_id"))
+            continue
+
+        rate = get_fx_rate(fx_rates, source_currency, target_currency, logger)
+        converted = dict(tx)
+        converted["amount"] = float(tx["amount"]) * rate
+        converted["balance"] = float(tx["balance"]) * rate
+        converted["currency"] = target_currency
+        prepared.append(converted)
+
+    return prepared
+
+
 def group_by_account(transactions: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
     grouped: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     for tx in transactions:
@@ -110,6 +172,90 @@ def group_by_account(transactions: List[Dict[str, Any]]) -> Dict[str, List[Dict[
     for account_code, items in grouped.items():
         items.sort(key=lambda item: (item["_date"], item["_seq"], item["transaction_id"]))
     return grouped
+
+
+def build_daily_series_from_grouped(
+    transactions_by_account: Dict[str, List[Dict[str, Any]]],
+    account_codes: List[str],
+    logger: logging.Logger,
+) -> Dict[str, List[Dict[str, Any]]]:
+    global_end_date: Optional[datetime.date] = None
+    if transactions_by_account:
+        all_txs = [tx for items in transactions_by_account.values() for tx in items]
+        if all_txs:
+            global_end_date = max(tx["_date"] for tx in all_txs)
+
+    daily_series: Dict[str, List[Dict[str, Any]]] = {}
+    for account_code in account_codes:
+        account_txs = transactions_by_account.get(account_code, [])
+        if not account_txs:
+            daily_series[account_code] = []
+            continue
+        start_date = account_txs[0]["_date"]
+        end_date = global_end_date or account_txs[-1]["_date"]
+        daily_series[account_code] = build_daily_series(
+            account_txs,
+            start_date,
+            end_date,
+            account_code,
+            logger,
+        )
+
+    return daily_series
+
+
+def build_converted_daily_series(
+    transactions_raw: List[Dict[str, Any]],
+    account_codes: List[str],
+    logger: logging.Logger,
+    account_targets: Dict[str, str],
+    fx_rates: Dict[str, Dict[str, float]],
+) -> Dict[str, List[Dict[str, Any]]]:
+    global_end_date: Optional[datetime.date] = None
+    if transactions_raw:
+        global_end_date = max(parse_date(tx["date"]) for tx in transactions_raw)
+
+    grouped: Dict[str, Dict[str, List[Dict[str, Any]]]] = defaultdict(lambda: defaultdict(list))
+    for tx in transactions_raw:
+        account_code = tx.get("account_code")
+        if account_code not in account_targets:
+            continue
+        source_currency = tx.get("currency")
+        if not source_currency:
+            logger.warning("Missing source currency for transaction: %s", tx.get("transaction_id"))
+            continue
+
+        target_currency = account_targets[account_code]
+        rate = get_fx_rate(fx_rates, source_currency, target_currency, logger)
+        converted = dict(tx)
+        converted["amount"] = float(tx["amount"]) * rate
+        converted["balance"] = float(tx["balance"]) * rate
+        converted["currency"] = target_currency
+        grouped[account_code][source_currency].append(converted)
+
+    daily_series: Dict[str, List[Dict[str, Any]]] = {}
+    for account_code in account_codes:
+        currency_series: Dict[str, List[Dict[str, Any]]] = {}
+        for source_currency, txs in grouped.get(account_code, {}).items():
+            normalized = normalize_transactions(txs)
+            if not normalized:
+                continue
+            start_date = min(tx["_date"] for tx in normalized)
+            end_date = global_end_date or max(tx["_date"] for tx in normalized)
+            currency_series[source_currency] = build_daily_series(
+                normalized,
+                start_date,
+                end_date,
+                account_code,
+                logger,
+            )
+
+        if currency_series:
+            daily_series[account_code] = build_total_series(currency_series)
+        else:
+            daily_series[account_code] = []
+
+    return daily_series
 
 
 def build_daily_series(
@@ -306,6 +452,7 @@ def build_monthly_combo(series: List[Dict[str, Any]], months: int = 12) -> List[
 def build_transactions_output(
     account_codes: List[str],
     transactions_by_account: Dict[str, List[Dict[str, Any]]],
+    include_total: bool = True,
 ) -> Dict[str, Dict[str, List[Dict[str, Any]]]]:
     def tx_sort_key(tx: Dict[str, Any]) -> Any:
         return (tx["_date"], tx["_seq"], tx["transaction_id"])
@@ -318,12 +465,13 @@ def build_transactions_output(
             "transactions": [serialize_transaction(tx) for tx in txs]
         }
 
-    all_txs: List[Dict[str, Any]] = []
-    for account_code in account_codes:
-        all_txs.extend(transactions_by_account.get(account_code, []))
-    all_txs.sort(key=tx_sort_key)
+    if include_total:
+        all_txs: List[Dict[str, Any]] = []
+        for account_code in account_codes:
+            all_txs.extend(transactions_by_account.get(account_code, []))
+        all_txs.sort(key=tx_sort_key)
 
-    output["total"] = {"transactions": [serialize_transaction(tx) for tx in all_txs]}
+        output["total"] = {"transactions": [serialize_transaction(tx) for tx in all_txs]}
     return output
 
 
@@ -341,12 +489,72 @@ def serialize_transaction(tx: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def build_dataset(
+    transactions_raw: List[Dict[str, Any]],
+    account_codes: List[str],
+    logger: logging.Logger,
+    account_targets: Optional[Dict[str, str]] = None,
+    filter_currency: Optional[str] = None,
+    fx_rates: Optional[Dict[str, Dict[str, float]]] = None,
+    include_total: bool = True,
+) -> Dict[str, Any]:
+    prepared = prepare_transactions(
+        transactions_raw,
+        logger,
+        account_targets=account_targets,
+        filter_currency=filter_currency,
+        fx_rates=fx_rates,
+    )
+    transactions = normalize_transactions(prepared)
+    transactions_by_account = group_by_account(transactions)
+
+    if account_targets and fx_rates and not filter_currency:
+        daily_series = build_converted_daily_series(
+            transactions_raw,
+            account_codes,
+            logger,
+            account_targets,
+            fx_rates,
+        )
+    else:
+        daily_series = build_daily_series_from_grouped(
+            transactions_by_account,
+            account_codes,
+            logger,
+        )
+
+    if include_total:
+        daily_series["total"] = build_total_series(daily_series)
+
+    static_charts: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
+    for account_code, series in daily_series.items():
+        static_charts[account_code] = {
+            "heatmap": build_heatmap(series),
+            "monthly_combo": build_monthly_combo(series),
+        }
+
+    transactions_output = build_transactions_output(
+        account_codes,
+        transactions_by_account,
+        include_total=include_total,
+    )
+
+    return {
+        "daily_series": daily_series,
+        "static_charts": static_charts,
+        "transactions": transactions_output,
+    }
+
+
 def main() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     data_dir = repo_root / "data"
     db_dir = data_dir / "database"
     ui_dir = data_dir / "ui"
     log_dir = data_dir / "logs"
+    settings_path = repo_root / "settings.json"
+    currency_path = db_dir / "currency.json"
+    fx_rate_path = db_dir / "fx_rate.json"
 
     logger = setup_logger(log_dir / "processor.log")
 
@@ -358,50 +566,99 @@ def main() -> None:
         return
 
     transactions_raw = load_json(transactions_path)
-    transactions = normalize_transactions(transactions_raw)
-    transactions_by_account = group_by_account(transactions)
 
-    global_end_date: Optional[datetime.date] = None
-    if transactions:
-        global_end_date = max(tx["_date"] for tx in transactions)
-
+    accounts_raw: List[Dict[str, Any]] = []
     if accounts_path.exists():
         accounts_raw = load_json(accounts_path)
         account_codes = [item["account_code"] for item in accounts_raw]
     else:
-        account_codes = sorted(transactions_by_account.keys())
+        account_codes = sorted({tx["account_code"] for tx in transactions_raw})
 
-    daily_series: Dict[str, List[Dict[str, Any]]] = {}
+    account_defaults = {
+        item["account_code"]: item.get("default_currency") for item in accounts_raw
+    }
 
-    for account_code in account_codes:
-        account_txs = transactions_by_account.get(account_code, [])
-        if not account_txs:
-            daily_series[account_code] = []
-            continue
-        start_date = account_txs[0]["_date"]
-        end_date = global_end_date or account_txs[-1]["_date"]
-        daily_series[account_code] = build_daily_series(
-            account_txs,
-            start_date,
-            end_date,
-            account_code,
+    supported_currency_codes: List[str] = []
+    for account in accounts_raw:
+        supported_currency_codes.extend(account.get("supported_currencies", []))
+    supported_currency_codes = sorted(set(supported_currency_codes))
+
+    currencies_raw: List[Dict[str, Any]] = []
+    if currency_path.exists():
+        currencies_raw = load_json(currency_path)
+
+    fx_rates: Dict[str, Dict[str, float]] = {}
+    if fx_rate_path.exists():
+        fx_payload = load_json(fx_rate_path)
+        fx_rates = fx_payload.get("rates", {})
+
+    settings: Dict[str, Any] = {}
+    if settings_path.exists():
+        settings = load_json(settings_path)
+
+    global_default_currency = settings.get("global_default_currency")
+    if not global_default_currency:
+        if account_defaults:
+            global_default_currency = next(iter(account_defaults.values()))
+        elif currencies_raw:
+            global_default_currency = currencies_raw[0].get("currency_code")
+
+    if not global_default_currency:
+        logger.error("Missing global default currency setting.")
+        return
+
+    if not fx_rates:
+        logger.error("Missing fx rate data: %s", fx_rate_path)
+        return
+
+    daily_series_by_currency: Dict[str, Any] = {}
+    static_charts_by_currency: Dict[str, Any] = {}
+    transactions_by_currency: Dict[str, Any] = {}
+
+    global_targets = {code: global_default_currency for code in account_codes}
+    local_targets = {
+        code: account_defaults.get(code, global_default_currency) for code in account_codes
+    }
+
+    global_dataset = build_dataset(
+        transactions_raw,
+        account_codes,
+        logger,
+        account_targets=global_targets,
+        fx_rates=fx_rates,
+        include_total=True,
+    )
+    daily_series_by_currency[DEFAULT_DATASET_KEY] = global_dataset["daily_series"]
+    static_charts_by_currency[DEFAULT_DATASET_KEY] = global_dataset["static_charts"]
+    transactions_by_currency[DEFAULT_DATASET_KEY] = global_dataset["transactions"]
+
+    local_dataset = build_dataset(
+        transactions_raw,
+        account_codes,
+        logger,
+        account_targets=local_targets,
+        fx_rates=fx_rates,
+        include_total=False,
+    )
+    daily_series_by_currency[DEFAULT_LOCAL_KEY] = local_dataset["daily_series"]
+    static_charts_by_currency[DEFAULT_LOCAL_KEY] = local_dataset["static_charts"]
+    transactions_by_currency[DEFAULT_LOCAL_KEY] = local_dataset["transactions"]
+
+    for currency_code in supported_currency_codes:
+        filtered_dataset = build_dataset(
+            transactions_raw,
+            account_codes,
             logger,
+            filter_currency=currency_code,
+            include_total=True,
         )
+        daily_series_by_currency[currency_code] = filtered_dataset["daily_series"]
+        static_charts_by_currency[currency_code] = filtered_dataset["static_charts"]
+        transactions_by_currency[currency_code] = filtered_dataset["transactions"]
 
-    daily_series["total"] = build_total_series(daily_series)
-
-    static_charts: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
-    for account_code, series in daily_series.items():
-        static_charts[account_code] = {
-            "heatmap": build_heatmap(series),
-            "monthly_combo": build_monthly_combo(series),
-        }
-
-    transactions_output = build_transactions_output(account_codes, transactions_by_account)
-
-    write_json(ui_dir / "ui_daily_series.json", daily_series)
-    write_json(ui_dir / "ui_static_charts.json", static_charts)
-    write_json(ui_dir / "ui_transactions_and_categories.json", transactions_output)
+    write_json(ui_dir / "ui_daily_series.json", daily_series_by_currency)
+    write_json(ui_dir / "ui_static_charts.json", static_charts_by_currency)
+    write_json(ui_dir / "ui_transactions_and_categories.json", transactions_by_currency)
 
     logger.info("Generated UI data: %s", ui_dir)
 
