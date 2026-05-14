@@ -598,20 +598,16 @@ def build_dataset(
 
 
 def main() -> None:
-    repo_root = Path(__file__).resolve().parents[2]
-    data_dir = repo_root / "data"
-    db_dir = data_dir / "database"
-    ui_dir = data_dir / "ui"
-    log_dir = data_dir / "logs"
-    settings_path = repo_root / "settings.json"
-    config_dir = data_dir / "config"
-    currency_path = config_dir / "currency.json"
-    fx_rate_path = db_dir / "fx_rate.json"
+    from path_config import ROOT, DATA_DIR, DB_DIR, UI_DIR, LOG_DIR, CONFIG_DIR
 
-    logger = setup_logger(log_dir / "processor.log")
+    settings_path = ROOT / "settings.json"
+    currency_path = CONFIG_DIR / "currency.json"
+    fx_rate_path = DB_DIR / "fx_rate.json"
 
-    accounts_path = config_dir / "accounts.json"
-    transactions_path = db_dir / "transactions.json"
+    logger = setup_logger(LOG_DIR / "processor.log")
+
+    accounts_path = CONFIG_DIR / "accounts.json"
+    transactions_path = DB_DIR / "transactions.json"
 
     if not transactions_path.exists():
         logger.error("Missing transactions file: %s", transactions_path)
@@ -628,7 +624,7 @@ def main() -> None:
 
     accounts_by_code = {item["account_code"]: item for item in accounts_raw}
 
-    parsed_path = db_dir / "parsed.json"
+    parsed_path = DB_DIR / "parsed.json"
     hash_to_filename: Dict[str, str] = {}
     if parsed_path.exists():
         for entry in load_json(parsed_path):
@@ -729,13 +725,13 @@ def main() -> None:
     static_charts_by_currency["_meta"] = meta
     transactions_by_currency["_meta"] = meta
 
-    write_json(ui_dir / "ui_daily_series.json", daily_series_by_currency)
-    write_json(ui_dir / "ui_static_charts.json", static_charts_by_currency)
-    write_json(ui_dir / "ui_transactions_and_categories.json", transactions_by_currency)
+    write_json(UI_DIR / "ui_daily_series.json", daily_series_by_currency)
+    write_json(UI_DIR / "ui_static_charts.json", static_charts_by_currency)
+    write_json(UI_DIR / "ui_transactions_and_categories.json", transactions_by_currency)
     if currency_breakdown is not None:
-        write_json(ui_dir / "ui_currency_breakdown.json", currency_breakdown)
+        write_json(UI_DIR / "ui_currency_breakdown.json", currency_breakdown)
 
-    logger.info("Generated UI data: %s", ui_dir)
+    logger.info("Generated UI data: %s", UI_DIR)
 
 
 if __name__ == "__main__":

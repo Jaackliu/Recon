@@ -1,12 +1,20 @@
+// Extract user_id from URL path: /<user_id>/ or /<user_id>/index.html
+const _pathParts = window.location.pathname.split("/").filter(Boolean);
+const USER_ID = _pathParts[0] || null;
+
+if (!USER_ID) {
+  window.location.href = "/";
+}
+
 const DATA_PATHS = {
-  accounts: "../../data/config/accounts.json",
-  currencies: "../../data/config/currency.json",
-  dailySeries: "../../data/ui/ui_daily_series.json",
-  staticCharts: "../../data/ui/ui_static_charts.json",
-  transactions: "../../data/ui/ui_transactions_and_categories.json",
-  currencyBreakdown: "../../data/ui/ui_currency_breakdown.json",
-  fxRates: "../../data/database/fx_rate.json",
-  multiLang: "multi-lang.json"
+  accounts: "./data/config/accounts.json",
+  currencies: "./data/config/currency.json",
+  dailySeries: "./data/ui/ui_daily_series.json",
+  staticCharts: "./data/ui/ui_static_charts.json",
+  transactions: "./data/ui/ui_transactions_and_categories.json",
+  currencyBreakdown: "./data/ui/ui_currency_breakdown.json",
+  fxRates: "./data/database/fx_rate.json",
+  multiLang: "./multi-lang.json"
 };
 
 const state = {
@@ -216,8 +224,6 @@ function setActiveThemeOption() {
   });
 }
 
-const API_BASE = "http://127.0.0.1:5001";
-
 async function handleFileUpload() {
   const files = dom.fileInput.files;
   if (!files.length) return;
@@ -226,7 +232,7 @@ async function handleFileUpload() {
   for (const file of files) formData.append("files", file);
 
   try {
-    const res = await fetch(`${API_BASE}/api/upload`, { method: "POST", body: formData });
+    const res = await fetch(`/${USER_ID}/api/upload`, { method: "POST", body: formData });
     if (!res.ok) throw new Error();
     const data = await res.json();
     showToast(t("toast.uploadSuccess") + ` (${data.saved.length})`);
@@ -239,7 +245,7 @@ async function handleFileUpload() {
 async function handleParsePdf() {
   dom.parsePdfBtn.disabled = true;
   try {
-    const res = await fetch(`${API_BASE}/api/parse`, { method: "POST" });
+    const res = await fetch(`/${USER_ID}/api/parse`, { method: "POST" });
     if (!res.ok) throw new Error();
     showToast(t("toast.parseStarted"));
   } catch {
@@ -251,7 +257,7 @@ async function handleParsePdf() {
 async function handleRefreshData() {
   dom.refreshDataBtn.disabled = true;
   try {
-    const res = await fetch(`${API_BASE}/api/refresh`, { method: "POST" });
+    const res = await fetch(`/${USER_ID}/api/refresh`, { method: "POST" });
     if (!res.ok) throw new Error();
     showToast(t("toast.refreshDone"));
     setTimeout(() => location.reload(), 600);
@@ -271,7 +277,7 @@ function formatNotification(key, params) {
 
 async function fetchMessages() {
   try {
-    const res = await fetch(`${API_BASE}/api/messages`);
+    const res = await fetch(`/${USER_ID}/api/messages`);
     if (!res.ok) throw new Error();
     return await res.json();
   } catch {

@@ -137,6 +137,27 @@
 - 样式：新增 `.language-selector`、`.language-option`、`.lang-icon` 样式，CJK 字体回退
 - 文档：更新 `schema.md`（alias 类型、类别枚举）、`process.md`（JSON 示例）、`frontend.md`（语言选择器）
 
+## 2026-05-14 (多用户支持 Multi-User)
+
+- 新增多用户支持：每个用户拥有完全隔离的数据目录
+- 后端架构：
+  - 新增 `src/backend/path_config.py`：通过 `FINANCE_DATA_DIR` 环境变量解析用户数据路径
+  - 所有后端脚本（parser.py, processor.py, fetch_fx.py, check_transactions.py, detect_reclassify.py, migrate_categories.py）重构为使用 `path_config` 代替硬编码路径
+  - `api_server.py` 重构：合并静态文件服务，所有路由按用户隔离（`/<user_id>/...`），子进程通过环境变量传递用户数据目录
+  - 每用户独立的 4:00 AM 定时刷新调度
+- 前端架构：
+  - 新增 `src/frontend/landing.html`：用户选择页面
+  - `app.js` 从 URL 提取 `USER_ID`，数据路径改为相对路径，API 路径改为用户隔离
+- 数据目录结构：
+  - 新增 `users.json`：用户注册表
+  - 新增 `data_users/<user_id>/`：每用户独立的 data 目录（config, database, ui, logs, raw_input）
+  - 新增 `scripts/migrate_to_multiuser.sh`：数据迁移脚本
+- 服务器变更：
+  - 合并为单一 Flask 服务器（端口 8000），同时提供 API 和静态文件服务
+  - 绑定 `0.0.0.0` 支持局域网访问
+  - `load.sh` 简化为单进程启动
+- 文档：更新 `progress.md`、`CLAUDE.md` 目录结构
+
 ## Plan
 
 - [x] Implement src/backend/processor.py to generate UI JSON files.

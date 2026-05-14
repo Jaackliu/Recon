@@ -19,6 +19,8 @@ from anthropic import Anthropic
 import check_transactions
 import detect_reclassify
 
+from path_config import ROOT, DB_DIR, LOG_DIR, CONFIG_DIR, RAW_INPUT_DIR
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -33,13 +35,9 @@ BALANCE_CHECK_MAX_RETRIES = 3
 
 TZ_CST = timezone(timedelta(hours=8))
 
-ROOT = Path(__file__).resolve().parents[2]
-PDF_DIR = ROOT / "data" / "raw_input"
-DB_DIR = ROOT / "data" / "database"
-LOG_DIR = ROOT / "data" / "logs"
+PDF_DIR = RAW_INPUT_DIR
 PROMPT_PATH = Path(__file__).resolve().parent / "prompts" / "parse_transactions.txt"
 
-CONFIG_DIR = ROOT / "data" / "config"
 ACCOUNTS_PATH = CONFIG_DIR / "accounts.json"
 CURRENCY_PATH = CONFIG_DIR / "currency.json"
 TRANSACTIONS_PATH = DB_DIR / "transactions.json"

@@ -7,9 +7,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-ROOT = Path(__file__).resolve().parents[2]
-DB_DIR = ROOT / "data" / "database"
-LOG_DIR = ROOT / "data" / "logs"
+from path_config import DB_DIR, LOG_DIR
 
 TRANSACTIONS_PATH = DB_DIR / "transactions.json"
 PARSED_PATH = DB_DIR / "parsed.json"

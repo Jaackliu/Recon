@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Finance Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --rausch: #ff385c;
+        --ink: #222222;
+        --body: #3f3f3f;
+        --muted: #6a6a6a;
+        --hairline: #dddddd;
+        --surface-soft: #f7f7f7;
+        --canvas: #ffffff;
+        --shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 2px 6px,
+          rgba(0, 0, 0, 0.1) 0 4px 8px;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --ink: #f0f0f0;
+          --body: #c0c0c0;
+          --muted: #888888;
+          --hairline: #333333;
+          --surface-soft: #1a1a1a;
+          --canvas: #111111;
+          --shadow: rgba(255, 255, 255, 0.04) 0 0 0 1px,
+            rgba(0, 0, 0, 0.3) 0 2px 6px, rgba(0, 0, 0, 0.4) 0 4px 8px;
+        }
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont,
+          "Segoe UI", Roboto, sans-serif;
+        background: var(--canvas);
+        color: var(--ink);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .landing {
+        text-align: center;
+        padding: 2rem;
+        max-width: 600px;
+        width: 100%;
+      }
+
+      .landing-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+      }
+
+      .landing h1 {
+        font-size: 1.75rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+      }
+
+      .landing p {
+        color: var(--muted);
+        margin-bottom: 2rem;
+        font-size: 0.95rem;
+      }
+
+      .user-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 1rem;
+      }
+
+      .user-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 1.75rem 1.25rem;
+        background: var(--surface-soft);
+        border: 1px solid var(--hairline);
+        border-radius: 14px;
+        text-decoration: none;
+        color: var(--ink);
+        box-shadow: var(--shadow);
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+      }
+
+      .user-card:hover {
+        transform: translateY(-2px);
+        box-shadow: rgba(0, 0, 0, 0.04) 0 0 0 1px, rgba(0, 0, 0, 0.08) 0 4px 12px,
+          rgba(0, 0, 0, 0.16) 0 8px 20px;
+      }
+
+      .user-avatar {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: var(--rausch);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        font-weight: 700;
+      }
+
+      .user-name {
+        font-weight: 600;
+        font-size: 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="landing">
+      <div class="landing-icon">&#128200;</div>
+      <h1>Finance Dashboard</h1>
+      <p>Select your profile to continue</p>
+      <div id="userList" class="user-grid"></div>
+    </div>
+    <script>
+      fetch("/api/users")
+        .then((r) => r.json())
+        .then((users) => {
+          const grid = document.getElementById("userList");
+          if (!users.length) {
+            grid.innerHTML =
+              '<p style="color:var(--muted)">No users configured. Add entries to users.json.</p>';
+            return;
+          }
+          users.forEach((u) => {
+            const card = document.createElement("a");
+            card.href = `/${u.id}/`;
+            card.className = "user-card";
+            const initial = (u.name || u.id).charAt(0).toUpperCase();
+            card.innerHTML = `
+              <div class="user-avatar">${initial}</div>
+              <div class="user-name">${escapeHtml(u.name || u.id)}</div>
+            `;
+            grid.appendChild(card);
+          });
+        })
+        .catch(() => {
+          document.getElementById("userList").innerHTML =
+            '<p style="color:var(--rausch)">Failed to load user list.</p>';
+        });
+
+      function escapeHtml(str) {
+        const d = document.createElement("div");
+        d.textContent = str;
+        return d.innerHTML;
+      }
+    </script>
+  </body>
+</html>

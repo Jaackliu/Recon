@@ -20,9 +20,7 @@ from typing import Any, Dict, List, Set, Tuple
 
 sys.dont_write_bytecode = True
 
-ROOT = Path(__file__).resolve().parents[2]
-DB_DIR = ROOT / "data" / "database"
-LOG_DIR = ROOT / "data" / "logs"
+from path_config import DB_DIR, LOG_DIR
 
 TRANSACTIONS_PATH = DB_DIR / "transactions.json"
 

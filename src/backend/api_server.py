@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -8,34 +9,61 @@ import threading
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory, abort
 from flask_cors import CORS
 
 ROOT = Path(__file__).resolve().parents[2]
-RAW_INPUT_DIR = ROOT / "data" / "raw_input"
+FRONTEND_DIR = ROOT / "src" / "frontend"
 BACKEND_DIR = ROOT / "src" / "backend"
-LOG_DIR = ROOT / "data" / "logs"
-NOTIF_LOG = LOG_DIR / "notifications.jsonl"
+USERS_PATH = ROOT / "users.json"
 PYTHON = sys.executable
 
 app = Flask(__name__)
 CORS(app)
 
 # ---------------------------------------------------------------------------
-# Message store
+# User registry
 # ---------------------------------------------------------------------------
-_messages: list[dict] = []
+
+
+def load_users() -> list[dict]:
+    if not USERS_PATH.exists():
+        return []
+    return json.loads(USERS_PATH.read_text(encoding="utf-8"))
+
+
+def get_user(user_id: str) -> dict | None:
+    for u in load_users():
+        if u["id"] == user_id:
+            return u
+    return None
+
+
+def user_data_dir(user_id: str) -> Path | None:
+    user = get_user(user_id)
+    if not user:
+        return None
+    return (ROOT / user["data_dir"]).resolve()
+
+
+# ---------------------------------------------------------------------------
+# Per-user message store
+# ---------------------------------------------------------------------------
+_messages: dict[str, list[dict]] = {}
 _lock = threading.Lock()
 
 
-def _add_message(key: str, params: dict | None = None):
+def _add_message(user_id: str, key: str, params: dict | None = None):
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     msg = {"timestamp": ts, "key": key, "params": params or {}}
+    data_dir = user_data_dir(user_id)
     with _lock:
-        _messages.insert(0, msg)
-    NOTIF_LOG.parent.mkdir(parents=True, exist_ok=True)
-    with NOTIF_LOG.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(msg, ensure_ascii=False) + "\n")
+        _messages.setdefault(user_id, []).insert(0, msg)
+    if data_dir:
+        notif_log = data_dir / "logs" / "notifications.jsonl"
+        notif_log.parent.mkdir(parents=True, exist_ok=True)
+        with notif_log.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(msg, ensure_ascii=False) + "\n")
 
 
 def _extract_info(stdout: str) -> str:
@@ -47,13 +75,18 @@ def _extract_info(stdout: str) -> str:
     return stdout.strip()[-200:] if stdout.strip() else ""
 
 
-def _run_script(script: str) -> tuple[bool, str]:
-    """Run a backend script, return (success, info_text)."""
+def _run_script(script: str, user_id: str) -> tuple[bool, str]:
+    """Run a backend script with FINANCE_DATA_DIR set for the user."""
+    data_dir = user_data_dir(user_id)
+    if not data_dir:
+        return False, f"Unknown user: {user_id}"
+    env = {**os.environ, "FINANCE_DATA_DIR": str(data_dir)}
     result = subprocess.run(
         [PYTHON, str(BACKEND_DIR / script)],
         cwd=str(BACKEND_DIR),
         capture_output=True,
         text=True,
+        env=env,
     )
     if result.returncode != 0:
         err = result.stderr.strip()[-300:] if result.stderr else "unknown error"
@@ -66,66 +99,120 @@ def _run_script(script: str) -> tuple[bool, str]:
 # Background parse watcher
 # ---------------------------------------------------------------------------
 
-def _parse_watcher():
+def _parse_watcher(user_id: str):
     """Run parser.py and report results via messages."""
-    ok, info = _run_script("parser.py")
+    ok, info = _run_script("parser.py", user_id)
     if ok:
-        _add_message("msg.parse_done", {"detail": info})
+        _add_message(user_id, "msg.parse_done", {"detail": info})
     else:
-        _add_message("msg.parse_error", {"error": info})
+        _add_message(user_id, "msg.parse_error", {"error": info})
 
 
 # ---------------------------------------------------------------------------
 # Refresh logic (shared by API endpoint and scheduler)
 # ---------------------------------------------------------------------------
 
-def _do_refresh(auto: bool = False):
+def _do_refresh(user_id: str, auto: bool = False):
     """Run fetch_fx.py + processor.py, record messages."""
-    ok, info = _run_script("fetch_fx.py")
+    ok, info = _run_script("fetch_fx.py", user_id)
     if ok:
-        _add_message("msg.fx_done", {"detail": info})
+        _add_message(user_id, "msg.fx_done", {"detail": info})
     else:
-        _add_message("msg.fx_error", {"error": info})
+        _add_message(user_id, "msg.fx_error", {"error": info})
         return False
 
-    ok, info = _run_script("processor.py")
+    ok, info = _run_script("processor.py", user_id)
     if ok:
-        _add_message("msg.processor_done", {})
+        _add_message(user_id, "msg.processor_done", {})
     else:
-        _add_message("msg.processor_error", {"error": info})
+        _add_message(user_id, "msg.processor_error", {"error": info})
         return False
 
     key = "msg.auto_refresh" if auto else "msg.refresh_done"
-    _add_message(key, {})
+    _add_message(user_id, key, {})
     return True
 
 
 # ---------------------------------------------------------------------------
-# Daily 4:00 AM scheduler
+# Per-user daily 4:00 AM scheduler
 # ---------------------------------------------------------------------------
 
-def _schedule_next():
+def _schedule_all_users():
+    for user in load_users():
+        _schedule_next(user["id"])
+
+
+def _schedule_next(user_id: str):
     now = datetime.now()
     target = now.replace(hour=4, minute=0, second=0, microsecond=0)
     if now >= target:
         target += timedelta(days=1)
     delay = (target - now).total_seconds()
-    timer = threading.Timer(delay, _on_daily_tick)
+    timer = threading.Timer(delay, _on_daily_tick, args=(user_id,))
     timer.daemon = True
     timer.start()
 
 
-def _on_daily_tick():
-    _do_refresh(auto=True)
-    _schedule_next()
+def _on_daily_tick(user_id: str):
+    _do_refresh(user_id, auto=True)
+    _schedule_next(user_id)
 
 
 # ---------------------------------------------------------------------------
-# API endpoints
+# Static file serving
 # ---------------------------------------------------------------------------
 
-@app.route("/api/upload", methods=["POST"])
-def upload_files():
+@app.route("/")
+def landing_page():
+    return send_from_directory(FRONTEND_DIR, "landing.html")
+
+
+@app.route("/api/users", methods=["GET"])
+def list_users():
+    return jsonify(load_users())
+
+
+@app.route("/<user_id>/")
+def user_dashboard(user_id):
+    if not get_user(user_id):
+        abort(404)
+    return send_from_directory(FRONTEND_DIR, "index.html")
+
+
+@app.route("/<user_id>/app.js")
+def serve_app_js(user_id):
+    return send_from_directory(FRONTEND_DIR, "app.js")
+
+
+@app.route("/<user_id>/styles.css")
+def serve_styles(user_id):
+    return send_from_directory(FRONTEND_DIR, "styles.css")
+
+
+@app.route("/<user_id>/multi-lang.json")
+def serve_multi_lang(user_id):
+    return send_from_directory(FRONTEND_DIR, "multi-lang.json")
+
+
+@app.route("/<user_id>/data/<path:subpath>")
+def serve_user_data(user_id, subpath):
+    data_dir = user_data_dir(user_id)
+    if not data_dir:
+        abort(404)
+    return send_from_directory(str(data_dir), subpath)
+
+
+# ---------------------------------------------------------------------------
+# API endpoints (user-scoped)
+# ---------------------------------------------------------------------------
+
+@app.route("/<user_id>/api/upload", methods=["POST"])
+def upload_files(user_id):
+    if not get_user(user_id):
+        abort(404)
+    raw_input_dir = user_data_dir(user_id) / "raw_input"
+    raw_input_dir.mkdir(parents=True, exist_ok=True)
+
     uploaded = request.files.getlist("files")
     if not uploaded:
         return jsonify({"error": "No files provided"}), 400
@@ -134,40 +221,48 @@ def upload_files():
     for f in uploaded:
         if not f.filename:
             continue
-        dest = RAW_INPUT_DIR / Path(f.filename).name
+        dest = raw_input_dir / Path(f.filename).name
         f.save(str(dest))
         saved.append(f.filename)
 
     if not saved:
         return jsonify({"error": "No valid files"}), 400
 
-    _add_message("msg.upload_success", {"count": len(saved), "files": ", ".join(saved)})
+    _add_message(user_id, "msg.upload_success", {"count": len(saved), "files": ", ".join(saved)})
     return jsonify({"saved": saved})
 
 
-@app.route("/api/parse", methods=["POST"])
-def parse_pdfs():
-    _add_message("msg.parse_started", {})
-    t = threading.Thread(target=_parse_watcher, daemon=True)
+@app.route("/<user_id>/api/parse", methods=["POST"])
+def parse_pdfs(user_id):
+    if not get_user(user_id):
+        abort(404)
+    _add_message(user_id, "msg.parse_started", {})
+    t = threading.Thread(target=_parse_watcher, args=(user_id,), daemon=True)
     t.start()
     return jsonify({"status": "started"})
 
 
-@app.route("/api/refresh", methods=["POST"])
-def refresh_data():
-    ok = _do_refresh(auto=False)
+@app.route("/<user_id>/api/refresh", methods=["POST"])
+def refresh_data(user_id):
+    if not get_user(user_id):
+        abort(404)
+    ok = _do_refresh(user_id, auto=False)
     if ok:
         return jsonify({"status": "done"})
     return jsonify({"status": "error"}), 500
 
 
-@app.route("/api/messages", methods=["GET"])
-def get_messages():
+@app.route("/<user_id>/api/messages", methods=["GET"])
+def get_messages(user_id):
+    if not get_user(user_id):
+        abort(404)
     with _lock:
-        return jsonify(list(_messages))
+        return jsonify(list(_messages.get(user_id, [])))
 
 
 if __name__ == "__main__":
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-    _schedule_next()
-    app.run(host="127.0.0.1", port=5001, debug=False)
+    for user in load_users():
+        d = ROOT / user["data_dir"]
+        (d / "logs").mkdir(parents=True, exist_ok=True)
+    _schedule_all_users()
+    app.run(host="0.0.0.0", port=8000, debug=False)
