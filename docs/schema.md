@@ -17,7 +17,7 @@
 | :--- | :--- | :--- | :--- |
 | **货币代码** | `currency_code` | String | **主键**。两位数字字符串（例："01"），全系统唯一。 |
 | **ISO 货币代码** | `currency_iso` | String | ISO 4217 三位大写字母（例："CNY"），用于汇率获取与跨系统对接。 |
-| **货币名称** | `currency_name` | String | 用于 AI API 识别（例："人民币"、"美元"、"港币"）。 |
+| **货币别名** | `alias` | String | 用于前端展示（例："人民币"、"美元"、"港币"）。 |
 | **货币符号** | `currency_symbol` | String | 用于前端显示（例："￥"、"$"、"HK$"）。 |
 
 ### 1.1 `fx_rate.json` (汇率矩阵)
@@ -30,7 +30,7 @@
 | **数据日期** | `as_of` | String | 汇率日期，格式 `YYYY-MM-DD`。 |
 | **数据来源** | `source` | String | 数据源名称（例："Frankfurter (ECB)"）。 |
 | **查询基准币种** | `base_iso` | String | 请求第三方汇率接口时所用的 ISO 基准币种。 |
-| **货币清单** | `currencies` | Array[Object] | 与 `currency.json` 一致的币种清单，每个对象必须包含 `currency_code`、`currency_iso`、`currency_name`、`currency_symbol`。 |
+| **货币清单** | `currencies` | Array[Object] | 与 `currency.json` 一致的币种清单，每个对象必须包含 `currency_code`、`currency_iso`、`alias`、`currency_symbol`。 |
 | **汇率矩阵** | `rates` | Object | 以 `currency_code` 为键的嵌套对象。`rates[A][B]` 表示 A→B 的汇率，**必须包含所有币种两两组合**，同币种汇率为 `1.0`，数值为四舍五入保留 6 位小数的 Float。 |
 
 ### 1.2 `settings.json` (全局设置)
@@ -50,7 +50,7 @@
 | 字段名 | 键名 (Key) | 数据类型 | 说明 / 约束 |
 | :--- | :--- | :--- | :--- |
 | **银行账户代码** | `account_code` | String | **主键**。手动规定的三位数字符串（例："001"），全系统唯一。 |
-| **备注名** | `alias` | String | 仅用于前端展示的易读名称（例："招行主卡"）。 |
+| **备注名** | `alias` | String | 仅用于前端展示的易读名称（例："招行主卡"），不传入 AI API。 |
 | **账户名称** | `account_name` | String | 账户正式名称（例："招商银行借记卡"）。 |
 | **发行银行** | `bank_name` | String | 发卡行名称（例："招商银行"）。 |
 | **账号** | `account_number` | String | 银行卡号或统一账号。 |

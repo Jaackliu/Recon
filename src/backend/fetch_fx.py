@@ -58,7 +58,7 @@ def load_currencies() -> List[Dict[str, str]]:
             continue
         currency_code = str(item.get("currency_code", "")).strip()
         currency_iso = str(item.get("currency_iso", "")).strip().upper()
-        currency_name = str(item.get("currency_name", "")).strip()
+        alias = str(item.get("alias", "")).strip()
         currency_symbol = str(item.get("currency_symbol", "")).strip()
         if not currency_code or not currency_iso:
             raise ValueError("currency.json has missing currency_code or currency_iso")
@@ -66,7 +66,7 @@ def load_currencies() -> List[Dict[str, str]]:
             {
                 "currency_code": currency_code,
                 "currency_iso": currency_iso,
-                "currency_name": currency_name,
+                "alias": alias,
                 "currency_symbol": currency_symbol,
             }
         )

@@ -172,14 +172,17 @@ def build_system_prompt(accounts: List[Dict[str, Any]], currencies: List[Dict[st
     for account in accounts:
         prompt_accounts.append({
             "account_code": account.get("account_code", ""),
-            "alias": account.get("alias", ""),
             "account_name": account.get("account_name", ""),
             "bank_name": account.get("bank_name", ""),
             "account_number": account.get("account_number", ""),
             "supported_currencies": account.get("supported_currencies", []),
         })
     accounts_json = json.dumps(prompt_accounts, indent=2, ensure_ascii=False)
-    currency_json = json.dumps(currencies, indent=2, ensure_ascii=False)
+    prompt_currencies = [
+        {k: v for k, v in c.items() if k != "alias"}
+        for c in currencies
+    ]
+    currency_json = json.dumps(prompt_currencies, indent=2, ensure_ascii=False)
     return template.format(accounts_json=accounts_json, currency_json=currency_json)
 
 

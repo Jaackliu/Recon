@@ -97,6 +97,15 @@
   - 更新 `docs/process.md` 中的 JSON schema 和示例
   - 更新 `docs/frontend.md` 中的展示字段和交互说明
 
+## 2026-05-14 (AI API Prompt 清理与字段重命名)
+- `currency.json` 字段重命名：`currency_name` → `alias`，与 `accounts.json` 的 `alias` 语义对齐（均为前端展示别名）。
+- AI API Prompt 精简：
+  - `accounts.json`：不再传入 `alias`（仅前端使用，AI 无需知晓）。
+  - `currency.json`：不再传入 `alias`（仅前端使用，AI 无需知晓）。
+- 代码更新：`parser.py`（prompt 构建）、`fetch_fx.py`（字段读取）、`app.js`（4 处 `currency_name` → `alias`）。
+- 文档更新：`schema.md`、`frontend.md` 同步字段名变更。
+- `fx_rate.json` 需重新生成（`fetch_fx.py` 输出的 currencies 数组字段已变更）。
+
 ## 2026-05-14 (Transaction Hover Tooltip)
 - 前端：所有 transaction 行（交易列表页 + 详情弹窗）hover 高亮，光标旁浮窗显示 `transactions.json` 全部字段
   - 事件委托绑定在 `#transactionsList` 和 `#detailList` 容器上

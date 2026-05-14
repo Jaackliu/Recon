@@ -56,7 +56,7 @@
 *   **选项来源**：
     *   当选择“总资产”时：允许选择“默认”以及所有账户 `supported_currencies` 的并集。
     *   当选择特定账户时：允许选择“默认”以及该账户的 `supported_currencies`。
-*   **展示文本**：具体币种选项使用 `data/config/currency.json` 的 `currency_name` 字段展示。
+*   **展示文本**：具体币种选项使用 `data/config/currency.json` 的 `alias` 字段展示。
 *   **默认币种语义**：
     *   **特定账户 + 默认**：使用该账户在 `data/config/accounts.json` 中的 `default_currency` 视角。
     *   **总资产 + 默认**：使用 `settings.json` 的 `global_default_currency` 视角。
@@ -77,7 +77,7 @@
 *   **UI 形式**：带有齿轮图标的按钮，点击后打开设置弹窗。
 *   **设置弹窗内容**：
     *   **主题选择 (Appearance)**：提供三个选项 - “System”（跟随系统）、”Light”（浅色模式）、”Dark”（深色模式）。
-    *   **默认货币选择 (Default Currency)**：显示所有可用货币选项，使用 `data/config/currency.json` 的 `currency_symbol` 和 `currency_name` 展示。
+    *   **默认货币选择 (Default Currency)**：显示所有可用货币选项，使用 `data/config/currency.json` 的 `currency_symbol` 和 `alias` 展示。
 *   **数据持久化**：
     *   主题设置保存到 `localStorage` 的 `theme` 键。
     *   默认货币设置保存到 `localStorage` 的 `defaultCurrency` 键。

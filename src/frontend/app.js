@@ -165,7 +165,7 @@ function buildCurrencySelector() {
     const button = document.createElement("button");
     button.className = "currency-option";
     button.dataset.currency = currency.currency_code;
-    button.innerHTML = `<span class="currency-symbol">${escapeHtml(currency.currency_symbol)}</span><span class="currency-name">${escapeHtml(currency.currency_name)}</span>`;
+    button.innerHTML = `<span class="currency-symbol">${escapeHtml(currency.currency_symbol)}</span><span class="currency-name">${escapeHtml(currency.alias)}</span>`;
     button.addEventListener("click", () => {
       selectDefaultCurrency(currency.currency_code);
     });
@@ -459,7 +459,7 @@ function updateCurrencyOptions() {
     { value: "default", label: "Default" },
     ...available.map((code) => {
       const currency = getCurrencyByCode(code);
-      return { value: code, label: currency ? currency.currency_name : code };
+      return { value: code, label: currency ? currency.alias : code };
     })
   ];
 
@@ -564,7 +564,7 @@ function updateBalanceOverview(series, slice, range) {
     if (breakdown && breakdown.length > 0) {
       breakdown.forEach((item) => {
         const currency = getCurrencyByCode(item.currency);
-        const name = currency ? currency.currency_name : item.currency;
+        const name = currency ? currency.alias : item.currency;
         const row = document.createElement("div");
         row.className = "account-row";
         row.innerHTML = `<span>${escapeHtml(name)}</span><strong>${formatMoney(item.end_balance)}</strong>`;
@@ -1614,7 +1614,7 @@ function showTxTooltip(tx, event) {
   const el = document.getElementById("txTooltip");
   if (!el) return;
   const currency = getCurrencyByCode(tx.currency);
-  const currencyLabel = currency ? `${currency.currency_name} (${currency.currency_symbol})` : tx.currency;
+  const currencyLabel = currency ? `${currency.alias} (${currency.currency_symbol})` : tx.currency;
   const rows = [
     ["Transaction ID", tx.id],
     ["Date", tx.date],
