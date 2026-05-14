@@ -96,16 +96,30 @@ def _run_script(script: str, user_id: str) -> tuple[bool, str]:
 
 
 # ---------------------------------------------------------------------------
-# Background parse watcher
+# Background parse watcher with status tracking
 # ---------------------------------------------------------------------------
+_parse_status: dict[str, dict] = {}
+_parse_lock = threading.Lock()
+
 
 def _parse_watcher(user_id: str):
-    """Run parser.py and report results via messages."""
-    ok, info = _run_script("parser.py", user_id)
-    if ok:
-        _add_message(user_id, "msg.parse_done", {"detail": info})
-    else:
-        _add_message(user_id, "msg.parse_error", {"error": info})
+    """Run parser.py; on success, auto-run fetch_fx + processor."""
+    ok = False
+    try:
+        ok, info = _run_script("parser.py", user_id)
+        if ok:
+            _add_message(user_id, "msg.parse_done", {"detail": info})
+            # Auto-refresh: fetch FX rates and regenerate UI data
+            refresh_ok = _do_refresh(user_id, auto=False)
+            if refresh_ok:
+                _add_message(user_id, "msg.parse_refresh_done", {})
+        else:
+            _add_message(user_id, "msg.parse_error", {"error": info})
+    except Exception as exc:
+        _add_message(user_id, "msg.parse_error", {"error": str(exc)[:200]})
+    finally:
+        with _parse_lock:
+            _parse_status[user_id] = {"running": False, "ok": ok}
 
 
 # ---------------------------------------------------------------------------
@@ -236,10 +250,23 @@ def upload_files(user_id):
 def parse_pdfs(user_id):
     if not get_user(user_id):
         abort(404)
+    with _parse_lock:
+        if _parse_status.get(user_id, {}).get("running"):
+            return jsonify({"status": "already_running"}), 409
+        _parse_status[user_id] = {"running": True}
     _add_message(user_id, "msg.parse_started", {})
     t = threading.Thread(target=_parse_watcher, args=(user_id,), daemon=True)
     t.start()
     return jsonify({"status": "started"})
+
+
+@app.route("/<user_id>/api/parse/status", methods=["GET"])
+def parse_status(user_id):
+    if not get_user(user_id):
+        abort(404)
+    with _parse_lock:
+        status = _parse_status.get(user_id, {"running": False})
+    return jsonify(status)
 
 
 @app.route("/<user_id>/api/refresh", methods=["POST"])

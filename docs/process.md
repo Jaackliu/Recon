@@ -9,7 +9,7 @@
 
 ## 一、 `processor.py` 处理管线 (Processing Pipeline)
 
-`processor.py` 在每次 `parser.py` 更新 `transactions.json` 后手动运行，执行以下四个核心阶段：
+`processor.py` 在每次 `parser.py` 更新 `transactions.json` 后自动运行（通过 Parse PDF 按钮触发，后端依次执行 `fetch_fx.py` → `processor.py`），执行以下四个核心阶段：
 
 ### 0. 币种语义与汇率转换 (Multi-Currency Context)
 为了支持前端货币选择器，处理引擎必须提供两类数据视角：

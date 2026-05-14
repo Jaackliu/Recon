@@ -1822,6 +1822,36 @@ input {
   margin-top: 4px;
 }
 
+/* Parse button loading state */
+.data-action-btn.is-loading {
+  opacity: 0.6;
+  pointer-events: none;
+  position: relative;
+}
+
+.data-action-btn.is-loading::after {
+  content: "";
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-left: 6px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Error toast */
+.toast.toast-error {
+  background: #d32f2f;
+  color: #fff;
+}
+
 .config-empty {
   padding: 12px;
   text-align: center;

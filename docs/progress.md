@@ -158,6 +158,19 @@
   - `load.sh` 简化为单进程启动
 - 文档：更新 `progress.md`、`CLAUDE.md` 目录结构
 
+## 2026-05-14 (Parse + Auto-Refresh Pipeline)
+
+- Parse PDF 按钮现在自动触发完整数据管线：`parser.py` → `fetch_fx.py` → `processor.py`。
+- 后端 `api_server.py` 修改：
+  - `_parse_watcher` 在 `parser.py` 成功后自动调用 `_do_refresh()`。
+  - 管线完成后添加 `msg.parse_refresh_done` 消息。
+  - 整个管线在服务器后台线程运行，不受前端页面关闭影响。
+- 前端 `app.js` 修改：
+  - `pollParseStatus` 检测 `msg.parse_refresh_done` 后自动刷新页面。
+  - 如果解析失败（`msg.parse_error`），显示错误提示。
+- 多语言：新增 `msg.parse_refresh_done` 翻译（zh/en/fr）。
+- 文档：更新 `docs/process.md` 中 `processor.py` 运行方式说明。
+
 ## Plan
 
 - [x] Implement src/backend/processor.py to generate UI JSON files.

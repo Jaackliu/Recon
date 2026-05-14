@@ -258,15 +258,58 @@ async function handleFileUpload() {
 }
 
 async function handleParsePdf() {
-  dom.parsePdfBtn.disabled = true;
+  setParseLoading(true);
   try {
     const res = await fetch(`/${USER_ID}/api/parse`, { method: "POST" });
+    if (res.status === 409) {
+      showToast(t("toast.parseAlreadyRunning"));
+      setParseLoading(true);
+      pollParseStatus();
+      return;
+    }
     if (!res.ok) throw new Error();
     showToast(t("toast.parseStarted"));
+    pollParseStatus();
   } catch {
     showToast(t("toast.uploadFailed"));
+    setParseLoading(false);
   }
-  dom.parsePdfBtn.disabled = false;
+}
+
+function setParseLoading(loading) {
+  dom.parsePdfBtn.disabled = loading;
+  dom.parsePdfBtn.classList.toggle("is-loading", loading);
+}
+
+function pollParseStatus() {
+  const interval = setInterval(async () => {
+    try {
+      const res = await fetch(`/${USER_ID}/api/parse/status`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data.running) {
+        clearInterval(interval);
+        setParseLoading(false);
+        // Check latest messages for result
+        fetchMessages().then((msgs) => {
+          if (!msgs.length) return;
+          const latest = msgs[0];
+          if (latest.key === "msg.parse_error") {
+            showToast(formatNotification(latest.key, latest.params), true);
+          } else if (latest.key === "msg.parse_refresh_done") {
+            // Full pipeline complete: parse + refresh → reload page
+            showToast(t("toast.refreshDone"));
+            setTimeout(() => location.reload(), 600);
+          }
+          // If msg.parse_done but not msg.parse_refresh_done yet,
+          // the refresh is still running server-side; next manual
+          // page load will pick up the new data.
+        });
+      }
+    } catch {
+      // ignore polling errors
+    }
+  }, 5000);
 }
 
 async function handleRefreshData() {
@@ -2246,12 +2289,14 @@ function closeRangeModal() {
   dom.rangeModal.setAttribute("aria-hidden", "true");
 }
 
-function showToast(message) {
+function showToast(message, isError) {
   dom.toast.textContent = message;
+  dom.toast.classList.toggle("toast-error", !!isError);
   dom.toast.classList.add("is-visible");
   setTimeout(() => {
     dom.toast.classList.remove("is-visible");
-  }, 2200);
+    dom.toast.classList.remove("toast-error");
+  }, isError ? 4000 : 2200);
 }
 
 function escapeHtml(text) {
