@@ -80,14 +80,18 @@ def write_json(path: Path, data: Any) -> None:
 
 
 def setup_logger(log_path: Path) -> logging.Logger:
+    import sys
     log_path.parent.mkdir(parents=True, exist_ok=True)
     logger = logging.getLogger("processor")
     logger.setLevel(logging.INFO)
     if not logger.handlers:
-        handler = logging.FileHandler(log_path, encoding="utf-8")
         formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
+        fh = logging.FileHandler(log_path, encoding="utf-8")
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
+        sh = logging.StreamHandler(sys.stdout)
+        sh.setFormatter(formatter)
+        logger.addHandler(sh)
     return logger
 
 

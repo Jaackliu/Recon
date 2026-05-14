@@ -97,7 +97,15 @@ const dom = {
   settingsButton: document.getElementById("settingsButton"),
   settingsModal: document.getElementById("settingsModal"),
   closeSettingsModal: document.getElementById("closeSettingsModal"),
-  currencySelector: document.getElementById("currencySelector")
+  currencySelector: document.getElementById("currencySelector"),
+  uploadFileBtn: document.getElementById("uploadFileBtn"),
+  fileInput: document.getElementById("fileInput"),
+  parsePdfBtn: document.getElementById("parsePdfBtn"),
+  refreshDataBtn: document.getElementById("refreshDataBtn"),
+  notificationButton: document.getElementById("notificationButton"),
+  notificationModal: document.getElementById("notificationModal"),
+  closeNotificationModal: document.getElementById("closeNotificationModal"),
+  notificationList: document.getElementById("notificationList")
 };
 
 const palette = ["#ff385c", "#ff8b5a", "#f5c542", "#33b28a", "#2f80ed", "#222222", "#ff9aa7"];
@@ -206,6 +214,93 @@ function setActiveThemeOption() {
   document.querySelectorAll(".theme-option").forEach((option) => {
     option.classList.toggle("is-active", option.dataset.theme === state.theme);
   });
+}
+
+const API_BASE = "http://127.0.0.1:5001";
+
+async function handleFileUpload() {
+  const files = dom.fileInput.files;
+  if (!files.length) return;
+
+  const formData = new FormData();
+  for (const file of files) formData.append("files", file);
+
+  try {
+    const res = await fetch(`${API_BASE}/api/upload`, { method: "POST", body: formData });
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    showToast(t("toast.uploadSuccess") + ` (${data.saved.length})`);
+  } catch {
+    showToast(t("toast.uploadFailed"));
+  }
+  dom.fileInput.value = "";
+}
+
+async function handleParsePdf() {
+  dom.parsePdfBtn.disabled = true;
+  try {
+    const res = await fetch(`${API_BASE}/api/parse`, { method: "POST" });
+    if (!res.ok) throw new Error();
+    showToast(t("toast.parseStarted"));
+  } catch {
+    showToast(t("toast.uploadFailed"));
+  }
+  dom.parsePdfBtn.disabled = false;
+}
+
+async function handleRefreshData() {
+  dom.refreshDataBtn.disabled = true;
+  try {
+    const res = await fetch(`${API_BASE}/api/refresh`, { method: "POST" });
+    if (!res.ok) throw new Error();
+    showToast(t("toast.refreshDone"));
+    setTimeout(() => location.reload(), 600);
+  } catch {
+    showToast(t("toast.refreshFailed"));
+    dom.refreshDataBtn.disabled = false;
+  }
+}
+
+function formatNotification(key, params) {
+  let tpl = t(key);
+  for (const [k, v] of Object.entries(params)) {
+    tpl = tpl.replace(`{${k}}`, v);
+  }
+  return tpl;
+}
+
+async function fetchMessages() {
+  try {
+    const res = await fetch(`${API_BASE}/api/messages`);
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch {
+    return [];
+  }
+}
+
+async function openNotificationModal() {
+  dom.notificationModal.classList.add("is-open");
+  dom.notificationModal.setAttribute("aria-hidden", "false");
+  dom.notificationList.innerHTML = '<div class="notification-loading">...</div>';
+
+  const messages = await fetchMessages();
+  if (!messages.length) {
+    dom.notificationList.innerHTML = `<div class="notification-empty">${t("status.noData")}</div>`;
+    return;
+  }
+
+  dom.notificationList.innerHTML = messages.map((m) => `
+    <div class="notification-item">
+      <span class="notification-time">${escapeHtml(m.timestamp)}</span>
+      <span class="notification-text">${escapeHtml(formatNotification(m.key, m.params))}</span>
+    </div>
+  `).join("");
+}
+
+function closeNotificationModal() {
+  dom.notificationModal.classList.remove("is-open");
+  dom.notificationModal.setAttribute("aria-hidden", "true");
 }
 
 function openSettingsModal() {
@@ -474,6 +569,17 @@ function bindEvents() {
     if (event.target === dom.settingsModal) {
       closeSettingsModal();
     }
+  });
+
+  dom.uploadFileBtn.addEventListener("click", () => dom.fileInput.click());
+  dom.fileInput.addEventListener("change", handleFileUpload);
+  dom.parsePdfBtn.addEventListener("click", handleParsePdf);
+  dom.refreshDataBtn.addEventListener("click", handleRefreshData);
+
+  dom.notificationButton.addEventListener("click", openNotificationModal);
+  dom.closeNotificationModal.addEventListener("click", closeNotificationModal);
+  dom.notificationModal.addEventListener("click", (event) => {
+    if (event.target === dom.notificationModal) closeNotificationModal();
   });
 
   bindTxTooltipEvents(dom.transactionsList);
