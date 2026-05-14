@@ -44,27 +44,32 @@
           </div>
 
           <div class="panel">
+            <div class="panel-title">Currency</div>
+            <div class="pill-group" id="currencyList"></div>
+          </div>
+
+          <div class="panel">
             <div class="panel-title">Time range</div>
             <div class="range-buttons" id="rangeButtons">
-              <button class="pill" data-range="7">1 week</button>
-              <button class="pill" data-range="30">1 month</button>
-              <button class="pill" data-range="90">3 months</button>
-              <button class="pill" data-range="180">6 months</button>
-              <button class="pill" data-range="365">1 year</button>
+              <button class="pill" data-range="7">1W</button>
+              <button class="pill" data-range="30">1M</button>
+              <button class="pill" data-range="90">3M</button>
+              <button class="pill" data-range="180">6M</button>
+              <button class="pill" data-range="365">1Y</button>
               <button class="pill" data-range="all">All</button>
             </div>
             <button class="pill pill-wide" id="customRange">Customize</button>
             <div class="range-info" id="rangeInfo">--</div>
           </div>
 
-          <div class="panel panel-muted">
-            <div class="panel-title">Theme</div>
-            <div class="theme-buttons" id="themeButtons">
-              <button class="pill is-active" data-theme="system">System</button>
-              <button class="pill" data-theme="light">Light</button>
-              <button class="pill" data-theme="dark">Dark</button>
-            </div>
-          </div>
+          <button class="settings-button" id="settingsButton" aria-label="Settings">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M10 12.5C11.3807 12.5 12.5 11.3807 12.5 10C12.5 8.61929 11.3807 7.5 10 7.5C8.61929 7.5 7.5 8.61929 7.5 10C7.5 11.3807 8.61929 12.5 10 12.5Z" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M16.1667 12.5C16.0333 12.7833 15.9667 13.1 15.9667 13.4333C15.9667 13.7667 16.0333 14.0833 16.1667 14.3667L16.2333 14.5C16.3333 14.7167 16.3333 14.95 16.2333 15.1667L15.5667 16.3333C15.4667 16.55 15.2667 16.6833 15.0333 16.6833C14.9333 16.6833 14.8333 16.6667 14.7333 16.6333L14.4833 16.5333C14.2 16.4 13.8833 16.3333 13.55 16.3333C13.2167 16.3333 12.9 16.4 12.6167 16.5333L12.3667 16.6333C12.15 16.7333 11.9 16.7333 11.6833 16.6333L10.5167 15.9667C10.3 15.8667 10.1667 15.6667 10.1667 15.4333C10.1667 15.3333 10.1833 15.2333 10.2167 15.1333L10.3167 14.8833C10.45 14.6 10.5167 14.2833 10.5167 13.95C10.5167 13.6167 10.45 13.3 10.3167 13.0167L10.2167 12.7667C10.1167 12.55 10.1167 12.3 10.2167 12.0833L10.8833 10.9167C10.9833 10.7 11.1833 10.5667 11.4167 10.5667C11.5167 10.5667 11.6167 10.5833 11.7167 10.6167L11.9667 10.7167C12.25 10.85 12.5667 10.9167 12.9 10.9167C13.2333 10.9167 13.55 10.85 13.8333 10.7167L14.0833 10.6167C14.3 10.5167 14.55 10.5167 14.7667 10.6167L15.9333 11.2833C16.15 11.3833 16.2833 11.5833 16.2833 11.8167C16.2833 11.9167 16.2667 12.0167 16.2333 12.1167L16.1667 12.5Z" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M7.5 10C7.5 11.3807 6.38071 12.5 5 12.5C3.61929 12.5 2.5 11.3807 2.5 10C2.5 8.61929 3.61929 7.5 5 7.5C6.38071 7.5 7.5 8.61929 7.5 10Z" stroke="currentColor" stroke-width="1.5"/>
+            </svg>
+            Settings
+          </button>
         </aside>
 
         <main class="main">
@@ -260,6 +265,51 @@
             <span>ID</span>
           </div>
           <div class="detail-rows" id="detailList"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal" id="settingsModal" aria-hidden="true">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Settings</h3>
+          <button class="icon-button" id="closeSettingsModal" aria-label="Close">x</button>
+        </div>
+        <div class="settings-content">
+          <div class="settings-section">
+            <div class="settings-section-title">Appearance</div>
+            <div class="theme-selector">
+              <button class="theme-option" data-theme="system">
+                <span class="theme-icon">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M8 1V15M1 8H15M2.5 2.5L13.5 13.5M13.5 2.5L2.5 13.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                  </svg>
+                </span>
+                <span>System</span>
+              </button>
+              <button class="theme-option" data-theme="light">
+                <span class="theme-icon">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.5"/>
+                    <path d="M8 1V3M8 13V15M1 8H3M13 8H15M3.05 3.05L4.46 4.46M11.54 11.54L12.95 12.95M12.95 3.05L11.54 4.46M4.46 11.54L3.05 12.95" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                  </svg>
+                </span>
+                <span>Light</span>
+              </button>
+              <button class="theme-option" data-theme="dark">
+                <span class="theme-icon">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M14 8.5C13.25 11.5 10.5 13.5 7.5 13.5C3.91 13.5 1 10.59 1 7C1 3.41 3.91 0.5 7.5 0.5C10.5 0.5 13.25 2.5 14 5.5C11.5 5.5 9 7 9 9.5C9 12 11.5 13.5 14 8.5Z" stroke="currentColor" stroke-width="1.5"/>
+                  </svg>
+                </span>
+                <span>Dark</span>
+              </button>
+            </div>
+          </div>
+          <div class="settings-section">
+            <div class="settings-section-title">Default Currency</div>
+            <div class="currency-selector" id="currencySelector"></div>
+          </div>
         </div>
       </div>
     </div>

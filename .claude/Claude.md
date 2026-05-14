@@ -30,7 +30,8 @@ finance-dashboard/
 │   └── frontend/
 ├── data/
 │   ├── raw_input/       # 存放银行账单 PDF
-│   ├── database/        # 存放 accounts/parsed/transactions.json 文件
+│   ├── config/          # 存放 accounts/currency.json 手动配置文件
+│   ├── database/        # 存放 parsed/transactions/fx_rate.json 等数据文件
 │   ├── ui/              # 存放前端显示相关 JSON 文件
 │   └── logs/
 ├── .gitignore

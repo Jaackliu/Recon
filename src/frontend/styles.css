@@ -110,6 +110,10 @@ input {
   max-width: 1440px;
   margin: 0 auto;
   padding: var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  box-sizing: border-box;
 }
 
 .top-nav {
@@ -188,15 +192,17 @@ input {
   display: grid;
   grid-template-columns: 280px 1fr;
   gap: var(--space-xl);
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .sidebar {
   display: flex;
   flex-direction: column;
   gap: var(--space-lg);
-  position: sticky;
-  top: 110px;
-  align-self: start;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .panel {
@@ -276,9 +282,23 @@ input {
   color: var(--canvas);
 }
 
+/* Dark mode button in light mode */
+:root[data-theme="light"] .theme-buttons .pill[data-theme="dark"],
+:root[data-theme="light"] .theme-buttons .pill[data-theme="dark"].is-active {
+  background: #3a3a3a;
+  border-color: #3a3a3a;
+  color: #ffffff;
+}
+
 .pill-wide {
   width: 100%;
   text-align: center;
+}
+
+.pill-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .range-info {
@@ -286,9 +306,129 @@ input {
   color: var(--muted);
 }
 
+.settings-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--canvas);
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--body);
+  transition: all 0.2s ease;
+}
+
+.settings-button:hover {
+  background: var(--surface-soft);
+  border-color: var(--rausch);
+  color: var(--ink);
+}
+
 .theme-buttons {
   display: flex;
   gap: 8px;
+}
+
+.settings-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-base);
+}
+
+.settings-section-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.theme-selector {
+  display: flex;
+  gap: 8px;
+}
+
+.theme-option {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--canvas);
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--body);
+  transition: all 0.2s ease;
+}
+
+.theme-option:hover {
+  border-color: var(--rausch);
+}
+
+.theme-option.is-active {
+  border-color: var(--rausch);
+  background: var(--delta-positive-bg);
+}
+
+.theme-icon {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+
+.theme-option.is-active .theme-icon {
+  color: var(--rausch);
+}
+
+.currency-selector {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.currency-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--canvas);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s ease;
+}
+
+.currency-option:hover {
+  border-color: var(--rausch);
+}
+
+.currency-option.is-active {
+  border-color: var(--rausch);
+  background: var(--delta-positive-bg);
+}
+
+.currency-symbol {
+  font-weight: 600;
+  min-width: 24px;
+}
+
+.currency-name {
+  color: var(--body);
 }
 
 .settings-row {
@@ -347,6 +487,8 @@ input {
   display: flex;
   flex-direction: column;
   gap: var(--space-lg);
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .view {
@@ -409,7 +551,8 @@ input {
 .cashflow-card,
 .heatmap-card,
 .monthly-card {
-  min-height: 150px;
+  height: 230px;
+  overflow: hidden;
 }
 
 .heatmap-card {
@@ -487,6 +630,9 @@ input {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .account-row {
@@ -544,7 +690,7 @@ input {
 
 .heatmap-card .chart,
 .monthly-card .chart {
-  height: 160px;
+  height: 140px;
 }
 
 .monthly-card .chart,
@@ -1009,14 +1155,23 @@ input {
 }
 
 @media (max-width: 1200px) {
+  .app {
+    height: auto;
+  }
+
   .layout {
     grid-template-columns: 1fr;
+    overflow: visible;
   }
 
   .sidebar {
-    position: static;
     flex-direction: row;
     flex-wrap: wrap;
+    overflow-y: visible;
+  }
+
+  .main {
+    overflow-y: visible;
   }
 
   .panel {

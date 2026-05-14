@@ -28,7 +28,7 @@ DPI = 200
 MAX_RETRIES = 3
 RETRY_DELAY = 5
 IMAGE_GROUP_SIZE = 2
-MAX_WORKERS = 5
+MAX_WORKERS = 10
 BALANCE_CHECK_MAX_RETRIES = 3
 
 TZ_CST = timezone(timedelta(hours=8))
@@ -39,7 +39,9 @@ DB_DIR = ROOT / "data" / "database"
 LOG_DIR = ROOT / "data" / "logs"
 PROMPT_PATH = Path(__file__).resolve().parent / "prompts" / "parse_transactions.txt"
 
-ACCOUNTS_PATH = DB_DIR / "accounts.json"
+CONFIG_DIR = ROOT / "data" / "config"
+ACCOUNTS_PATH = CONFIG_DIR / "accounts.json"
+CURRENCY_PATH = CONFIG_DIR / "currency.json"
 TRANSACTIONS_PATH = DB_DIR / "transactions.json"
 PARSED_PATH = DB_DIR / "parsed.json"
 
@@ -164,10 +166,21 @@ def load_prompt_template() -> str:
     return PROMPT_PATH.read_text(encoding="utf-8")
 
 
-def build_system_prompt(accounts: List[Dict[str, Any]]) -> str:
+def build_system_prompt(accounts: List[Dict[str, Any]], currencies: List[Dict[str, Any]]) -> str:
     template = load_prompt_template()
-    accounts_json = json.dumps(accounts, indent=2, ensure_ascii=False)
-    return template.format(accounts_json=accounts_json)
+    prompt_accounts: List[Dict[str, Any]] = []
+    for account in accounts:
+        prompt_accounts.append({
+            "account_code": account.get("account_code", ""),
+            "alias": account.get("alias", ""),
+            "account_name": account.get("account_name", ""),
+            "bank_name": account.get("bank_name", ""),
+            "account_number": account.get("account_number", ""),
+            "supported_currencies": account.get("supported_currencies", []),
+        })
+    accounts_json = json.dumps(prompt_accounts, indent=2, ensure_ascii=False)
+    currency_json = json.dumps(currencies, indent=2, ensure_ascii=False)
+    return template.format(accounts_json=accounts_json, currency_json=currency_json)
 
 
 def call_ai(
@@ -331,7 +344,7 @@ def assign_transaction_ids(
             "account_code": account_code,
             "type_code": type_code,
             "cashflow_direction": cashflow_direction,
-            "currency": str(raw.get("currency", "CNY")),
+            "currency": str(raw.get("currency", "01")),
             "amount": round(float(raw.get("amount", 0)), 2),
             "balance": round(float(raw.get("balance", 0)), 2),
             "category": str(raw.get("category", "其他")),
@@ -442,7 +455,11 @@ def parse_pdf(
         logger.error("Failed to parse AI response for %s. Response (truncated): %s",
                      pdf_path.name, response_text[:500])
         return [], None
-    logger.info("Extracted %d raw transactions from %s", len(raw_txns), pdf_path.name)
+    currencies_found = sorted({str(tx.get("currency", "")) for tx in raw_txns if tx.get("currency")})
+    logger.info("Extracted %d raw transactions from %s (account: %s, currencies: %s)",
+                len(raw_txns), pdf_path.name,
+                str(raw_txns[0].get("account_code", "unknown")).strip(),
+                ", ".join(currencies_found) if currencies_found else "unknown")
 
     raw_txns = validate_transactions(raw_txns, logger)
     if not raw_txns:
@@ -461,7 +478,9 @@ def parse_pdf(
         "processed_at": processed_at,
         "account_code": account_code,
     }
-    logger.debug("Assigned %d transaction IDs for %s (account: %s)", len(new_txns), pdf_path.name, account_code)
+    tx_currencies = sorted({tx["currency"] for tx in new_txns})
+    logger.debug("Assigned %d transaction IDs for %s (account: %s, currencies: %s)",
+                 len(new_txns), pdf_path.name, account_code, ", ".join(tx_currencies))
     return new_txns, parsed_entry
 
 
@@ -475,6 +494,7 @@ def run_balance_check_and_reparse(
     logger: logging.Logger,
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     for attempt in range(1, BALANCE_CHECK_MAX_RETRIES + 1):
+        # Balance check is performed per PDF and per currency.
         errors_by_hash = check_transactions.check_transactions_by_pdf(
             transactions,
             parsed_entries,
@@ -482,9 +502,9 @@ def run_balance_check_and_reparse(
         )
         if not errors_by_hash:
             if attempt == 1:
-                logger.info("Balance check: all PDFs ok")
+                logger.info("Balance check: all PDFs/currencies ok")
             else:
-                logger.info("Balance check passed after %d attempts", attempt)
+                logger.info("Balance check passed after %d attempts (per currency)", attempt)
             return transactions, parsed_entries
 
         failed_hashes = sorted(errors_by_hash.keys())
@@ -568,6 +588,11 @@ def main() -> None:
         return
     accounts = load_json(ACCOUNTS_PATH)
 
+    if not CURRENCY_PATH.exists():
+        logger.error("currency.json not found at %s", CURRENCY_PATH)
+        return
+    currencies = load_json(CURRENCY_PATH)
+
     # Load existing transactions
     if TRANSACTIONS_PATH.exists():
         transactions = load_json(TRANSACTIONS_PATH)
@@ -602,7 +627,7 @@ def main() -> None:
     logger.info("Found %d PDFs, %d unprocessed", len(pdf_files), len(unprocessed))
 
     # Load prompt template
-    system_prompt = build_system_prompt(accounts)
+    system_prompt = build_system_prompt(accounts, currencies)
 
     # Create API client
     import os
@@ -680,8 +705,11 @@ def main() -> None:
     write_json(TRANSACTIONS_PATH, transactions)
     write_json(PARSED_PATH, parsed_entries)
 
-    logger.info("Done: +%d new txns from %d PDFs, total %d transactions",
-                len(all_new_txns) + len(fee_txns), len(unprocessed), len(transactions))
+    new_accounts = sorted({tx["account_code"] for tx in all_new_txns})
+    new_currencies = sorted({tx["currency"] for tx in all_new_txns})
+    logger.info("Done: +%d new txns from %d PDFs, total %d transactions (accounts: %s, currencies: %s)",
+                len(all_new_txns) + len(fee_txns), len(unprocessed), len(transactions),
+                ", ".join(new_accounts), ", ".join(new_currencies))
 
 
 if __name__ == "__main__":

@@ -3,6 +3,9 @@ You are a financial data extraction expert. Your task is to extract all individu
 ## Known Accounts
 {accounts_json}
 
+## Currency Legend
+{currency_json}
+
 ## Output Format
 Return ONLY a raw JSON array — no markdown fences, no explanation, no extra text.
 Each element must be an object with these exact fields:
@@ -12,7 +15,7 @@ Each element must be an object with these exact fields:
     "date": "YYYY-MM-DD",
     "account_code": "001",
     "type_code": 1,
-    "currency": "CNY",
+    "currency": "01",
     "amount": 123.45,
     "balance": 67890.00,
     "category": "餐饮",
@@ -45,6 +48,11 @@ Each element must be an object with these exact fields:
 - Return the corresponding account_code (e.g. "001", "002").
 - Each PDF belongs to exactly ONE account. All transactions in a single response must share the same account_code.
 
+### currency
+- Output a currency_code (two-digit string) that exists in the account's supported_currencies list.
+- Use the currency legend above to map statement names/symbols to currency_code.
+- Never output a currency_code that is not in the account's supported_currencies.
+
 ### category
 Assign exactly one category from the allowed lists below. Choose the best match based on the transaction description.
 
@@ -63,4 +71,3 @@ Exclude date and amount if they are already captured in other fields.
 - Extract ALL transactions from the statement, maintaining their original order.
 - If a field is ambiguous, make your best judgment and proceed.
 - If the statement contains a summary/footer section, do NOT extract those as transactions.
-- Currency is always "CNY".

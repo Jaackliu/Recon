@@ -124,38 +124,6 @@ def build_pdf_name_map(parsed_entries: List[Dict[str, Any]]) -> Dict[str, str]:
     return name_map
 
 
-def build_prev_balance_map(
-    transactions: List[Dict[str, Any]],
-    logger: logging.Logger,
-) -> Dict[str, Optional[float]]:
-    by_account: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
-    for tx in transactions:
-        if not tx.get("source_hash"):
-            continue
-        account = str(tx.get("account_code", ""))
-        if not account:
-            continue
-        by_account[account].append(tx)
-
-    prev_balance_map: Dict[str, Optional[float]] = {}
-    for account, items in by_account.items():
-        items.sort(key=tx_sort_key)
-        prev_balance: Optional[float] = None
-        for tx in items:
-            tx_id = str(tx.get("transaction_id", ""))
-            prev_balance_map[tx_id] = prev_balance
-            balance = parse_float(tx.get("balance"))
-            if balance is None:
-                logger.error(
-                    "Balance check: invalid balance: account=%s tx=%s",
-                    account,
-                    tx_id,
-                )
-                continue
-            prev_balance = balance
-    return prev_balance_map
-
-
 def check_transactions_by_pdf(
     transactions: List[Dict[str, Any]],
     parsed_entries: List[Dict[str, Any]],
@@ -163,7 +131,6 @@ def check_transactions_by_pdf(
 ) -> Dict[str, List[Dict[str, Any]]]:
     pdf_name_map = build_pdf_name_map(parsed_entries)
     checkable = [tx for tx in transactions if tx.get("source_hash")]
-    prev_balance_map = build_prev_balance_map(checkable, logger)
 
     txns_by_hash: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     for tx in checkable:
@@ -184,48 +151,72 @@ def check_transactions_by_pdf(
             errors_by_hash.setdefault(source_hash, []).append({"reason": "multiple_accounts"})
             continue
 
+        txns_by_currency: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
         for tx in txns:
-            tx_id = str(tx.get("transaction_id", ""))
-            prev_balance = prev_balance_map.get(tx_id)
-            if prev_balance is None:
-                logger.debug("Balance check: skip tx without previous balance: %s", tx_id)
-                continue
-            amount = parse_float(tx.get("amount"))
-            balance = parse_float(tx.get("balance"))
-            if amount is None or balance is None:
-                logger.error(
-                    "Balance check: invalid amount/balance: tx=%s",
-                    tx_id,
-                )
-                errors_by_hash.setdefault(source_hash, []).append({"transaction_id": tx_id})
-                continue
-            signed = infer_signed_amount(tx, logger)
-            if signed is None:
-                errors_by_hash.setdefault(source_hash, []).append({"transaction_id": tx_id})
-                continue
-            expected = round_money(prev_balance + signed)
-            if abs(expected - balance) > EPSILON:
-                pdf_label = pdf_name_map.get(source_hash, source_hash)
-                logger.error(
-                    "Balance mismatch: pdf=%s tx=%s prev=%.2f amount=%.2f dir=%s expected=%.2f actual=%.2f",
-                    pdf_label,
-                    tx_id,
-                    prev_balance,
-                    amount,
-                    tx.get("cashflow_direction"),
-                    expected,
-                    balance,
-                )
-                errors_by_hash.setdefault(source_hash, []).append(
-                    {
-                        "transaction_id": tx_id,
-                        "prev_balance": prev_balance,
-                        "amount": amount,
-                        "cashflow_direction": tx.get("cashflow_direction"),
-                        "expected_balance": expected,
-                        "actual_balance": balance,
-                    }
-                )
+            currency = str(tx.get("currency", ""))
+            txns_by_currency[currency].append(tx)
+
+        for currency, currency_txns in txns_by_currency.items():
+            currency_txns.sort(key=tx_sort_key)
+            prev_balance: Optional[float] = None
+            for tx in currency_txns:
+                tx_id = str(tx.get("transaction_id", ""))
+                if prev_balance is None:
+                    balance = parse_float(tx.get("balance"))
+                    if balance is None:
+                        logger.error(
+                            "Balance check: invalid balance: account=%s currency=%s tx=%s",
+                            next(iter(account_codes), ""),
+                            currency,
+                            tx_id,
+                        )
+                    else:
+                        prev_balance = balance
+                    logger.debug("Balance check: skip tx without previous balance: %s", tx_id)
+                    continue
+                amount = parse_float(tx.get("amount"))
+                balance = parse_float(tx.get("balance"))
+                if amount is None or balance is None:
+                    logger.error(
+                        "Balance check: invalid amount/balance: tx=%s",
+                        tx_id,
+                    )
+                    errors_by_hash.setdefault(source_hash, []).append(
+                        {"transaction_id": tx_id, "currency": currency}
+                    )
+                    continue
+                signed = infer_signed_amount(tx, logger)
+                if signed is None:
+                    errors_by_hash.setdefault(source_hash, []).append(
+                        {"transaction_id": tx_id, "currency": currency}
+                    )
+                    continue
+                expected = round_money(prev_balance + signed)
+                if abs(expected - balance) > EPSILON:
+                    pdf_label = pdf_name_map.get(source_hash, source_hash)
+                    logger.error(
+                        "Balance mismatch: pdf=%s currency=%s tx=%s prev=%.2f amount=%.2f dir=%s expected=%.2f actual=%.2f",
+                        pdf_label,
+                        currency,
+                        tx_id,
+                        prev_balance,
+                        amount,
+                        tx.get("cashflow_direction"),
+                        expected,
+                        balance,
+                    )
+                    errors_by_hash.setdefault(source_hash, []).append(
+                        {
+                            "transaction_id": tx_id,
+                            "currency": currency,
+                            "prev_balance": prev_balance,
+                            "amount": amount,
+                            "cashflow_direction": tx.get("cashflow_direction"),
+                            "expected_balance": expected,
+                            "actual_balance": balance,
+                        }
+                    )
+                prev_balance = balance
 
     return errors_by_hash
 

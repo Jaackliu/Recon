@@ -56,6 +56,30 @@
   - Parser: `detect_refunds` and `detect_transfers` matching logic changed from `type_code` to `cashflow_direction` (2=outflow for expense, 1=inflow for income). `type_code` is only mutated as the result marker.
   - Extracted refund/transfer detection into `src/backend/detect_reclassify.py` — runnable standalone (`python detect_reclassify.py`) or importable by `parser.py`. Logs to `data/logs/detect_reclassify.log`.
 
+## 2026-05-12
+- Multi-currency schema introduced in [docs/schema.md](docs/schema.md): added `currency.json`, and switched account/transaction currency fields to currency codes.
+- Created `data/database/currency.json` with CNY/USD/HKD/EUR/JPY definitions.
+- Updated `data/database/accounts.json` to use currency codes and expanded supported currencies.
+- Parser prompt now includes currency legend and enforces supported currency selection; default currency is not passed to AI.
+- Balance checks and refund/transfer detection updated to run per PDF per currency.
+
+## 2026-05-13
+- Added `currency_iso` to `currency.json` for ISO 4217 mapping.
+- Added `fx_rate.json` schema to [docs/schema.md](docs/schema.md).
+- Created `src/backend/fetch_fx.py` to fetch Frankfurter rates and build full FX matrix.
+- Added `settings.json` with `global_default_currency` for total-asset default display.
+- Processor now outputs currency-scoped UI datasets (`default`, `default_local`, and currency codes) with FX conversion and currency filtering.
+- Frontend now supports a currency selector and renders amounts using the active currency symbol.
+- Fixed default-currency aggregation to sum balances and cashflow across all supported currencies per account before total-asset rollup.
+- **Bug fix**: Changing the default currency in settings now correctly converts all amounts using FX rates, not just the display symbol. The frontend loads `fx_rate.json` and applies runtime conversion to the `"default"` dataset when the user's selected currency differs from the processor's `global_default_currency` (written as `_meta.processor_default_currency` in UI JSON files). Also fixed currency breakdown display to use each currency's native symbol.
+- **Bug fix 2**: Fixed two issues in the FX conversion: (1) the conversion cache used a single global key that didn't distinguish between different collections (dailySeries/staticCharts/transactions), causing modules C-G to show wrong data; replaced with per-collection WeakMap cache. (2) `convertItem` didn't recursively convert nested arrays/objects (e.g., `heatmap[].net_inflow`, `monthly_combo[].end_balance`); replaced with `convertValue` that recursively traverses all nested structures.
+
+## 2026-05-14
+- Moved `accounts.json` and `currency.json` from `data/database/` to `data/config/` to separate hand-maintained config files from generated data files.
+- Updated all code path references: `parser.py`, `fetch_fx.py`, `processor.py`, `app.js`.
+- Updated documentation references in `schema.md`, `process.md`, `frontend.md`.
+- Updated `.claude/settings.local.json` permission allowlists.
+
 ## Plan
 
 - [x] Implement src/backend/processor.py to generate UI JSON files.

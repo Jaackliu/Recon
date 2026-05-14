@@ -1,6 +1,7 @@
 """Detect refunds (撤销/报销) and internal transfers (内部转账).
 
 Matches are based on `cashflow_direction` (1=inflow, 2=outflow).
+Detection is performed independently per currency.
 Matched pairs have their `type_code` mutated (3=refund, 4=transfer).
 
 Usage:
@@ -78,11 +79,13 @@ def build_seq_map(transactions: List[Dict[str, Any]]) -> Dict[Tuple[str, str], i
 
 
 def detect_refunds(transactions: List[Dict[str, Any]], logger: logging.Logger) -> None:
-    by_account: Dict[str, List[Dict[str, Any]]] = {}
+    by_account_currency: Dict[Tuple[str, str], List[Dict[str, Any]]] = {}
     for tx in transactions:
-        by_account.setdefault(tx["account_code"], []).append(tx)
+        account_code = str(tx.get("account_code", ""))
+        currency = str(tx.get("currency", ""))
+        by_account_currency.setdefault((account_code, currency), []).append(tx)
 
-    for account_code, txns in by_account.items():
+    for (account_code, currency), txns in by_account_currency.items():
         txns.sort(key=lambda t: (t["date"], t["transaction_id"]))
         consumed: Set[str] = set()
         for i, tx in enumerate(txns):
@@ -112,10 +115,11 @@ def detect_refunds(transactions: List[Dict[str, Any]], logger: logging.Logger) -
                     consumed.add(tx["transaction_id"])
                     consumed.add(other["transaction_id"])
                     logger.info(
-                        "Refund detected: %s (%.2f) <-> %s (%.2f) on %s~%s",
+                        "Refund detected: %s (%.2f) <-> %s (%.2f) on %s~%s currency=%s",
                         tx["transaction_id"], amount,
                         other["transaction_id"], other["amount"],
                         tx["date"], other["date"],
+                        currency,
                     )
                     break
 
@@ -125,66 +129,73 @@ def detect_transfers(
     logger: logging.Logger,
     processed_at: str | None = None,
 ) -> List[Dict[str, Any]]:
-    expenses: List[Dict[str, Any]] = []
-    incomes: List[Dict[str, Any]] = []
+    expenses_by_currency: Dict[str, List[Dict[str, Any]]] = {}
+    incomes_by_currency: Dict[str, List[Dict[str, Any]]] = {}
     for tx in transactions:
+        currency = str(tx.get("currency", ""))
         if tx["cashflow_direction"] == 2:
-            expenses.append(tx)
+            expenses_by_currency.setdefault(currency, []).append(tx)
         elif tx["cashflow_direction"] == 1:
-            incomes.append(tx)
+            incomes_by_currency.setdefault(currency, []).append(tx)
 
-    expenses.sort(key=lambda t: (t["date"], t["transaction_id"]))
-    incomes.sort(key=lambda t: (t["date"], t["transaction_id"]))
-
-    consumed: Set[str] = set()
     fee_txns: List[Dict[str, Any]] = []
+    currencies = set(expenses_by_currency.keys()) | set(incomes_by_currency.keys())
+    for currency in currencies:
+        expenses = expenses_by_currency.get(currency, [])
+        incomes = incomes_by_currency.get(currency, [])
 
-    for exp in expenses:
-        if exp["transaction_id"] in consumed:
-            continue
-        exp_date = datetime.strptime(exp["date"], "%Y-%m-%d").date()
-        exp_account = exp["account_code"]
-        exp_amount = exp["amount"]
+        expenses.sort(key=lambda t: (t["date"], t["transaction_id"]))
+        incomes.sort(key=lambda t: (t["date"], t["transaction_id"]))
 
-        best_match = None
-        for inc in incomes:
-            if inc["transaction_id"] in consumed:
-                continue
-            if inc["account_code"] == exp_account:
-                continue
-            inc_date = datetime.strptime(inc["date"], "%Y-%m-%d").date()
-            delta = (inc_date - exp_date).days
-            if delta < 0 or delta > 3:
-                continue
-            if exp_amount * 0.97 <= inc["amount"] <= exp_amount:
-                best_match = inc
-                break
+        consumed: Set[str] = set()
 
-        if best_match:
-            exp["type_code"] = 4
-            best_match["type_code"] = 4
-            consumed.add(exp["transaction_id"])
-            consumed.add(best_match["transaction_id"])
-            logger.info(
-                "Transfer detected: %s (%.2f, acct %s) <-> %s (%.2f, acct %s)",
-                exp["transaction_id"], exp_amount, exp_account,
-                best_match["transaction_id"], best_match["amount"], best_match["account_code"],
-            )
-            fee = round(exp_amount - best_match["amount"], 2)
-            if fee > 0.005:
-                fee_txns.append({
-                    "account_code": exp_account,
-                    "date": exp["date"],
-                    "type_code": 2,
-                    "cashflow_direction": 2,
-                    "currency": "CNY",
-                    "amount": fee,
-                    "balance": 0,
-                    "category": "其他",
-                    "description": "转账手续费",
-                    "raw_text": f"transfer fee for {exp['transaction_id']}",
-                })
-                logger.info("Fee transaction generated: %.2f for %s", fee, exp_account)
+        for exp in expenses:
+            if exp["transaction_id"] in consumed:
+                continue
+            exp_date = datetime.strptime(exp["date"], "%Y-%m-%d").date()
+            exp_account = exp["account_code"]
+            exp_amount = exp["amount"]
+
+            best_match = None
+            for inc in incomes:
+                if inc["transaction_id"] in consumed:
+                    continue
+                if inc["account_code"] == exp_account:
+                    continue
+                inc_date = datetime.strptime(inc["date"], "%Y-%m-%d").date()
+                delta = (inc_date - exp_date).days
+                if delta < 0 or delta > 3:
+                    continue
+                if exp_amount * 0.97 <= inc["amount"] <= exp_amount:
+                    best_match = inc
+                    break
+
+            if best_match:
+                exp["type_code"] = 4
+                best_match["type_code"] = 4
+                consumed.add(exp["transaction_id"])
+                consumed.add(best_match["transaction_id"])
+                logger.info(
+                    "Transfer detected: %s (%.2f, acct %s) <-> %s (%.2f, acct %s) currency=%s",
+                    exp["transaction_id"], exp_amount, exp_account,
+                    best_match["transaction_id"], best_match["amount"], best_match["account_code"],
+                    currency,
+                )
+                fee = round(exp_amount - best_match["amount"], 2)
+                if fee > 0.005:
+                    fee_txns.append({
+                        "account_code": exp_account,
+                        "date": exp["date"],
+                        "type_code": 2,
+                        "cashflow_direction": 2,
+                        "currency": currency or "01",
+                        "amount": fee,
+                        "balance": 0,
+                        "category": "其他",
+                        "description": "转账手续费",
+                        "raw_text": f"transfer fee for {exp['transaction_id']}",
+                    })
+                    logger.info("Fee transaction generated: %.2f for %s currency=%s", fee, exp_account, currency)
 
     # Assign IDs to fee transactions
     if fee_txns and processed_at is not None:
