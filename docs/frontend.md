@@ -59,7 +59,7 @@
 *   **展示文本**：具体币种选项使用 `data/config/currency.json` 的 `alias` 字段展示。
 *   **默认币种语义**：
     *   **特定账户 + 默认**：使用该账户在 `data/config/accounts.json` 中的 `default_currency` 视角。
-    *   **总资产 + 默认**：使用 `settings.json` 的 `global_default_currency` 视角。
+    *   **总资产 + 默认**：使用 processor 推断的默认币种视角（第一个账户的 `default_currency`）。
 *   **数据绑定契约**：
     *   “默认”使用后端输出的 `default` / `default_local` 数据集。
     *   具体币种使用后端输出的对应 `currency_code` 数据集。

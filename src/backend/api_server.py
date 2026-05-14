@@ -260,6 +260,122 @@ def get_messages(user_id):
         return jsonify(list(_messages.get(user_id, [])))
 
 
+@app.route("/<user_id>/api/setup", methods=["POST"])
+def setup_user(user_id):
+    """Initial setup: create config files for a new user."""
+    if not get_user(user_id):
+        abort(404)
+    data_dir = user_data_dir(user_id)
+    config_dir = data_dir / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+
+    body = request.get_json(silent=True) or {}
+    default_currency = body.get("default_currency", "01")
+    account = body.get("account", {})
+
+    # Build currency.json — copy from a known set or use what's provided
+    currencies = body.get("currencies")
+    if not currencies:
+        currencies = [
+            {"currency_code": "01", "currency_iso": "CNY", "alias": {"zh": "人民币", "en": "Chinese Yuan", "fr": "Yuan chinois"}, "currency_symbol": "￥"},
+            {"currency_code": "02", "currency_iso": "HKD", "alias": {"zh": "港币", "en": "Hong Kong Dollar", "fr": "Dollar hongkongais"}, "currency_symbol": "HK$"},
+            {"currency_code": "03", "currency_iso": "EUR", "alias": {"zh": "欧元", "en": "Euro", "fr": "Euro"}, "currency_symbol": "€"},
+            {"currency_code": "04", "currency_iso": "USD", "alias": {"zh": "美元", "en": "US Dollar", "fr": "Dollar américain"}, "currency_symbol": "$"},
+            {"currency_code": "05", "currency_iso": "JPY", "alias": {"zh": "日元", "en": "Japanese Yen", "fr": "Yen japonais"}, "currency_symbol": "¥"},
+        ]
+    with (config_dir / "currency.json").open("w", encoding="utf-8") as f:
+        json.dump(currencies, f, indent=2, ensure_ascii=False)
+
+    # Build accounts.json
+    accounts = []
+    if account.get("account_code"):
+        alias = account.get("alias", {})
+        if isinstance(alias, str):
+            alias = {"zh": alias, "en": alias, "fr": alias}
+        accounts.append({
+            "account_code": account["account_code"],
+            "alias": alias,
+            "account_name": account.get("account_name", ""),
+            "bank_name": account.get("bank_name", ""),
+            "account_number": account.get("account_number", ""),
+            "holder_name": account.get("holder_name", ""),
+            "default_currency": account.get("default_currency", default_currency),
+            "supported_currencies": account.get("supported_currencies", [default_currency]),
+        })
+    with (config_dir / "accounts.json").open("w", encoding="utf-8") as f:
+        json.dump(accounts, f, indent=2, ensure_ascii=False)
+
+    # Create empty database files
+    db_dir = data_dir / "database"
+    db_dir.mkdir(parents=True, exist_ok=True)
+    for name in ("transactions.json", "parsed.json"):
+        path = db_dir / name
+        if not path.exists():
+            with path.open("w", encoding="utf-8") as f:
+                json.dump([], f)
+
+    _add_message(user_id, "msg.setup_complete", {})
+    return jsonify({"status": "ok"})
+
+
+# ---------------------------------------------------------------------------
+# Config management API (accounts & currencies)
+# ---------------------------------------------------------------------------
+
+@app.route("/<user_id>/api/config/accounts", methods=["GET"])
+def get_accounts(user_id):
+    if not get_user(user_id):
+        abort(404)
+    config_dir = user_data_dir(user_id) / "config"
+    path = config_dir / "accounts.json"
+    if not path.exists():
+        return jsonify([])
+    return jsonify(json.loads(path.read_text(encoding="utf-8")))
+
+
+@app.route("/<user_id>/api/config/accounts", methods=["PUT"])
+def put_accounts(user_id):
+    if not get_user(user_id):
+        abort(404)
+    body = request.get_json(silent=True)
+    if not isinstance(body, list):
+        return jsonify({"error": "Expected a JSON array"}), 400
+    config_dir = user_data_dir(user_id) / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    path = config_dir / "accounts.json"
+    with path.open("w", encoding="utf-8") as f:
+        json.dump(body, f, indent=2, ensure_ascii=False)
+    _add_message(user_id, "msg.accounts_updated", {"count": len(body)})
+    return jsonify({"status": "ok", "count": len(body)})
+
+
+@app.route("/<user_id>/api/config/currencies", methods=["GET"])
+def get_currencies(user_id):
+    if not get_user(user_id):
+        abort(404)
+    config_dir = user_data_dir(user_id) / "config"
+    path = config_dir / "currency.json"
+    if not path.exists():
+        return jsonify([])
+    return jsonify(json.loads(path.read_text(encoding="utf-8")))
+
+
+@app.route("/<user_id>/api/config/currencies", methods=["PUT"])
+def put_currencies(user_id):
+    if not get_user(user_id):
+        abort(404)
+    body = request.get_json(silent=True)
+    if not isinstance(body, list):
+        return jsonify({"error": "Expected a JSON array"}), 400
+    config_dir = user_data_dir(user_id) / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    path = config_dir / "currency.json"
+    with path.open("w", encoding="utf-8") as f:
+        json.dump(body, f, indent=2, ensure_ascii=False)
+    _add_message(user_id, "msg.currencies_updated", {"count": len(body)})
+    return jsonify({"status": "ok", "count": len(body)})
+
+
 if __name__ == "__main__":
     for user in load_users():
         d = ROOT / user["data_dir"]

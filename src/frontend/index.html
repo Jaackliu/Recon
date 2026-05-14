@@ -320,6 +320,23 @@
             </div>
           </div>
           <div class="settings-section">
+            <div class="settings-section-title" data-multi-lang="modal.configuration">Configuration</div>
+            <div class="data-action-group">
+              <button class="data-action-btn" id="manageAccountsBtn">
+                <span class="data-action-icon">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h8M2 12h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </span>
+                <span data-multi-lang="modal.manageAccounts">Accounts</span>
+              </button>
+              <button class="data-action-btn" id="manageCurrenciesBtn">
+                <span class="data-action-icon">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M6 6.5C6 5.67 6.9 5 8 5s2 .67 2 1.5S9.1 8 8 8 6 8.67 6 9.5 6.9 11 8 11s2-.67 2-1.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M8 4.5V5M8 11v.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                </span>
+                <span data-multi-lang="modal.manageCurrencies">Currencies</span>
+              </button>
+            </div>
+          </div>
+          <div class="settings-section">
             <div class="settings-section-title" data-multi-lang="modal.appearance">Appearance</div>
             <div class="theme-selector">
               <button class="theme-option" data-theme="system">
@@ -384,6 +401,123 @@
       </div>
     </div>
 
+    <!-- Accounts & Currencies management modal -->
+    <div class="modal" id="configListModal" aria-hidden="true">
+      <div class="modal-card modal-card-wide">
+        <div class="modal-header">
+          <div class="config-modal-tabs">
+            <button class="config-tab is-active" data-tab="accounts" data-multi-lang="modal.manageAccounts">Accounts</button>
+            <button class="config-tab" data-tab="currencies" data-multi-lang="modal.manageCurrencies">Currencies</button>
+          </div>
+          <button class="icon-button" id="closeConfigListModal" aria-label="Close">x</button>
+        </div>
+        <div class="config-panel is-active" data-panel="accounts">
+          <div class="config-list" id="accountsList"></div>
+          <button class="data-action-btn config-add-btn" id="addAccountBtn">
+            <span class="data-action-icon">+</span>
+            <span data-multi-lang="modal.addAccount">Add Account</span>
+          </button>
+        </div>
+        <div class="config-panel" data-panel="currencies">
+          <div class="config-list" id="currenciesList"></div>
+          <button class="data-action-btn config-add-btn" id="addCurrencyBtn">
+            <span class="data-action-icon">+</span>
+            <span data-multi-lang="modal.addCurrency">Add Currency</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit modal for account/currency -->
+    <div class="modal" id="editConfigModal" aria-hidden="true">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 id="editConfigTitle">--</h3>
+          <button class="icon-button" id="closeEditConfigModal" aria-label="Close">x</button>
+        </div>
+        <div class="modal-body">
+          <div id="editConfigForm"></div>
+        </div>
+        <div class="modal-actions">
+          <button class="pill pill-ghost" id="deleteConfigBtn" data-multi-lang="modal.deleteConfig">Delete</button>
+          <div style="flex:1"></div>
+          <button class="pill" id="cancelEditConfig" data-multi-lang="modal.cancel">Cancel</button>
+          <button class="pill" id="saveEditConfig" data-multi-lang="modal.save">Save</button>
+        </div>
+      </div>
+    </div>
+
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <!-- Onboarding overlay for new users -->
+    <div class="onboarding-overlay" id="onboardingOverlay" style="display:none">
+      <div class="onboarding-card">
+        <div class="onboarding-header">
+          <div class="onboarding-icon">&#128202;</div>
+          <h2 data-multi-lang="onboarding.welcome">Welcome to Finance Dashboard</h2>
+          <p data-multi-lang="onboarding.subtitle">Let's set up your profile in a few steps.</p>
+        </div>
+
+        <!-- Step indicator -->
+        <div class="onboarding-steps">
+          <span class="onboarding-step is-active" data-step="1">1</span>
+          <span class="onboarding-step-line"></span>
+          <span class="onboarding-step" data-step="2">2</span>
+          <span class="onboarding-step-line"></span>
+          <span class="onboarding-step" data-step="3">3</span>
+        </div>
+
+        <!-- Step 1: Currency -->
+        <div class="onboarding-panel is-active" data-panel="1">
+          <h3 data-multi-lang="onboarding.chooseCurrency">Choose your default currency</h3>
+          <div class="onboarding-currency-grid" id="onboardingCurrencyGrid"></div>
+        </div>
+
+        <!-- Step 2: Account -->
+        <div class="onboarding-panel" data-panel="2">
+          <h3 data-multi-lang="onboarding.addAccount">Add your first bank account</h3>
+          <div class="onboarding-form">
+            <label class="field">
+              <span data-multi-lang="onboarding.bankName">Bank name</span>
+              <input type="text" id="obBankName" placeholder="e.g. China Construction Bank" />
+            </label>
+            <label class="field">
+              <span data-multi-lang="onboarding.accountName">Account name</span>
+              <input type="text" id="obAccountName" placeholder="e.g. Savings Card" />
+            </label>
+            <label class="field">
+              <span data-multi-lang="onboarding.holderName">Account holder</span>
+              <input type="text" id="obHolderName" placeholder="e.g. Zhang San" />
+            </label>
+            <label class="field">
+              <span data-multi-lang="onboarding.accountNumber">Account number</span>
+              <input type="text" id="obAccountNumber" placeholder="e.g. 6217001234567890" />
+            </label>
+          </div>
+        </div>
+
+        <!-- Step 3: Upload -->
+        <div class="onboarding-panel" data-panel="3">
+          <h3 data-multi-lang="onboarding.uploadTitle">Upload your first bank statement</h3>
+          <p class="onboarding-hint" data-multi-lang="onboarding.uploadHint">Upload a PDF bank statement to get started. You can also skip this and upload later from Settings.</p>
+          <div class="onboarding-upload-zone" id="obUploadZone">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+              <path d="M12 16V4M12 4L8 8M12 4L16 8"/>
+              <path d="M4 14v4a2 2 0 002 2h12a2 2 0 002-2v-4"/>
+            </svg>
+            <span data-multi-lang="onboarding.dragOrClick">Drag PDF here or click to select</span>
+            <input type="file" id="obFileInput" multiple accept=".pdf" hidden />
+          </div>
+          <div class="onboarding-file-list" id="obFileList"></div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="onboarding-actions">
+          <button class="pill pill-ghost" id="obSkip" data-multi-lang="onboarding.skip">Skip</button>
+          <button class="pill pill-ghost" id="obBack" style="display:none" data-multi-lang="onboarding.back">Back</button>
+          <button class="pill pill-primary" id="obNext" data-multi-lang="onboarding.next">Next</button>
+        </div>
+      </div>
+    </div>
   </body>
 </html>

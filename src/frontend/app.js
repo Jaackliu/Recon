@@ -113,7 +113,22 @@ const dom = {
   notificationButton: document.getElementById("notificationButton"),
   notificationModal: document.getElementById("notificationModal"),
   closeNotificationModal: document.getElementById("closeNotificationModal"),
-  notificationList: document.getElementById("notificationList")
+  notificationList: document.getElementById("notificationList"),
+  manageAccountsBtn: document.getElementById("manageAccountsBtn"),
+  manageCurrenciesBtn: document.getElementById("manageCurrenciesBtn"),
+  configListModal: document.getElementById("configListModal"),
+  closeConfigListModal: document.getElementById("closeConfigListModal"),
+  accountsList: document.getElementById("accountsList"),
+  currenciesList: document.getElementById("currenciesList"),
+  addAccountBtn: document.getElementById("addAccountBtn"),
+  addCurrencyBtn: document.getElementById("addCurrencyBtn"),
+  editConfigModal: document.getElementById("editConfigModal"),
+  editConfigTitle: document.getElementById("editConfigTitle"),
+  editConfigForm: document.getElementById("editConfigForm"),
+  closeEditConfigModal: document.getElementById("closeEditConfigModal"),
+  saveEditConfig: document.getElementById("saveEditConfig"),
+  cancelEditConfig: document.getElementById("cancelEditConfig"),
+  deleteConfigBtn: document.getElementById("deleteConfigBtn")
 };
 
 const palette = ["#ff385c", "#ff8b5a", "#f5c542", "#33b28a", "#2f80ed", "#222222", "#ff9aa7"];
@@ -321,6 +336,28 @@ function closeSettingsModal() {
   dom.settingsModal.setAttribute("aria-hidden", "true");
 }
 
+function openConfigListModal(tab) {
+  dom.configListModal.classList.add("is-open");
+  dom.configListModal.setAttribute("aria-hidden", "false");
+  switchConfigTab(tab || "accounts");
+}
+
+function closeConfigList() {
+  dom.configListModal.classList.remove("is-open");
+  dom.configListModal.setAttribute("aria-hidden", "true");
+}
+
+function switchConfigTab(tab) {
+  dom.configListModal.querySelectorAll(".config-tab").forEach((el) => {
+    el.classList.toggle("is-active", el.dataset.tab === tab);
+  });
+  dom.configListModal.querySelectorAll(".config-panel").forEach((el) => {
+    el.classList.toggle("is-active", el.dataset.panel === tab);
+  });
+  if (tab === "accounts") renderAccountsList();
+  else renderCurrenciesList();
+}
+
 function buildCurrencySelector() {
   if (!dom.currencySelector) return;
 
@@ -355,6 +392,217 @@ function selectDefaultCurrency(currencyCode) {
   showToast(t("toast.currencyUpdated"));
 }
 
+// ---------------------------------------------------------------------------
+// Config management (accounts & currencies in Settings)
+// ---------------------------------------------------------------------------
+
+function renderAccountsList() {
+  if (!dom.accountsList) return;
+  dom.accountsList.innerHTML = "";
+  state.data.accounts.forEach((acc) => {
+    const row = document.createElement("div");
+    row.className = "config-item";
+    row.innerHTML = `
+      <div class="config-item-info">
+        <span class="config-item-name">${escapeHtml(getAlias(acc.alias) || acc.account_name)}</span>
+        <span class="config-item-detail">${escapeHtml(acc.bank_name || "")} · ${escapeHtml(acc.account_code)}</span>
+      </div>
+      <button class="config-item-edit" data-code="${escapeHtml(acc.account_code)}" data-type="account">${t("modal.editConfig")}</button>
+    `;
+    dom.accountsList.appendChild(row);
+  });
+  if (!state.data.accounts.length) {
+    dom.accountsList.innerHTML = `<div class="config-empty">${t("modal.noAccounts")}</div>`;
+  }
+}
+
+function renderCurrenciesList() {
+  if (!dom.currenciesList) return;
+  dom.currenciesList.innerHTML = "";
+  state.data.currencies.forEach((cur) => {
+    const row = document.createElement("div");
+    row.className = "config-item";
+    row.innerHTML = `
+      <div class="config-item-info">
+        <span class="config-item-name">${escapeHtml(cur.currency_symbol)} ${escapeHtml(getAlias(cur.alias))}</span>
+        <span class="config-item-detail">${escapeHtml(cur.currency_iso)} · ${escapeHtml(cur.currency_code)}</span>
+      </div>
+      <button class="config-item-edit" data-code="${escapeHtml(cur.currency_code)}" data-type="currency">${t("modal.editConfig")}</button>
+    `;
+    dom.currenciesList.appendChild(row);
+  });
+  if (!state.data.currencies.length) {
+    dom.currenciesList.innerHTML = `<div class="config-empty">${t("modal.noCurrencies")}</div>`;
+  }
+}
+
+let editConfigTarget = null; // { type: "account"|"currency", code: string|null (null = add new), data: object }
+
+function openEditConfigModal(type, code) {
+  editConfigTarget = { type, code };
+  const isNew = code === null;
+
+  if (type === "account") {
+    const acc = isNew ? {} : state.data.accounts.find((a) => a.account_code === code) || {};
+    dom.editConfigTitle.textContent = isNew ? t("modal.addAccount") : t("modal.editAccount");
+    dom.editConfigForm.innerHTML = buildAccountForm(acc);
+    dom.deleteConfigBtn.style.display = isNew ? "none" : "";
+  } else {
+    const cur = isNew ? {} : state.data.currencies.find((c) => c.currency_code === code) || {};
+    dom.editConfigTitle.textContent = isNew ? t("modal.addCurrency") : t("modal.editCurrency");
+    dom.editConfigForm.innerHTML = buildCurrencyForm(cur);
+    dom.deleteConfigBtn.style.display = isNew ? "none" : "";
+  }
+
+  dom.editConfigModal.classList.add("is-open");
+  dom.editConfigModal.setAttribute("aria-hidden", "false");
+}
+
+function closeEditConfig() {
+  dom.editConfigModal.classList.remove("is-open");
+  dom.editConfigModal.setAttribute("aria-hidden", "true");
+  editConfigTarget = null;
+}
+
+function buildAccountForm(acc) {
+  const alias = acc.alias || {};
+  return `
+    <label class="field"><span>${t("onboarding.accountCode")}</span><input type="text" id="efAccountCode" value="${escapeHtml(acc.account_code || "")}" ${acc.account_code ? "readonly style='opacity:0.6'" : ""} placeholder="001" /></label>
+    <label class="field"><span>${t("onboarding.bankName")}</span><input type="text" id="efBankName" value="${escapeHtml(acc.bank_name || "")}" /></label>
+    <label class="field"><span>${t("onboarding.accountName")}</span><input type="text" id="efAccountName" value="${escapeHtml(acc.account_name || "")}" /></label>
+    <label class="field"><span>${t("onboarding.holderName")}</span><input type="text" id="efHolderName" value="${escapeHtml(acc.holder_name || "")}" /></label>
+    <label class="field"><span>${t("onboarding.accountNumber")}</span><input type="text" id="efAccountNumber" value="${escapeHtml(acc.account_number || "")}" /></label>
+    <label class="field"><span>${t("modal.aliasZh")}</span><input type="text" id="efAliasZh" value="${escapeHtml(alias.zh || "")}" /></label>
+    <label class="field"><span>${t("modal.aliasEn")}</span><input type="text" id="efAliasEn" value="${escapeHtml(alias.en || "")}" /></label>
+    <label class="field"><span>${t("modal.aliasFr")}</span><input type="text" id="efAliasFr" value="${escapeHtml(alias.fr || "")}" /></label>
+    <label class="field"><span>${t("modal.defaultCurrencyLabel")}</span>
+      <select id="efDefaultCurrency">${state.data.currencies.map((c) => `<option value="${c.currency_code}" ${c.currency_code === (acc.default_currency || "01") ? "selected" : ""}>${c.currency_symbol} ${getAlias(c.alias)}</option>`).join("")}</select>
+    </label>
+    <label class="field"><span>${t("modal.supportedCurrencies")}</span>
+      <div class="checkbox-group" id="efSupportedCurrencies">${state.data.currencies.map((c) => `<label class="checkbox-label"><input type="checkbox" value="${c.currency_code}" ${(acc.supported_currencies || []).includes(c.currency_code) ? "checked" : ""} /> ${c.currency_symbol} ${getAlias(c.alias)}</label>`).join("")}</div>
+    </label>
+  `;
+}
+
+function buildCurrencyForm(cur) {
+  const alias = cur.alias || {};
+  return `
+    <label class="field"><span>${t("modal.currencyCode")}</span><input type="text" id="efCurrencyCode" value="${escapeHtml(cur.currency_code || "")}" ${cur.currency_code ? "readonly style='opacity:0.6'" : ""} placeholder="06" /></label>
+    <label class="field"><span>${t("modal.currencyIso")}</span><input type="text" id="efCurrencyIso" value="${escapeHtml(cur.currency_iso || "")}" ${cur.currency_iso ? "readonly style='opacity:0.6'" : ""} placeholder="GBP" /></label>
+    <label class="field"><span>${t("modal.currencySymbol")}</span><input type="text" id="efCurrencySymbol" value="${escapeHtml(cur.currency_symbol || "")}" placeholder="£" /></label>
+    <label class="field"><span>${t("modal.aliasZh")}</span><input type="text" id="efCurAliasZh" value="${escapeHtml(alias.zh || "")}" /></label>
+    <label class="field"><span>${t("modal.aliasEn")}</span><input type="text" id="efCurAliasEn" value="${escapeHtml(alias.en || "")}" /></label>
+    <label class="field"><span>${t("modal.aliasFr")}</span><input type="text" id="efCurAliasFr" value="${escapeHtml(alias.fr || "")}" /></label>
+  `;
+}
+
+function saveEditConfig() {
+  if (!editConfigTarget) return;
+  const { type, code } = editConfigTarget;
+  const isNew = code === null;
+
+  if (type === "account") {
+    const newCode = document.getElementById("efAccountCode").value.trim();
+    if (!newCode) { showToast(t("toast.codeRequired")); return; }
+
+    const newAcc = {
+      account_code: newCode,
+      alias: {
+        zh: document.getElementById("efAliasZh").value.trim() || newCode,
+        en: document.getElementById("efAliasEn").value.trim() || newCode,
+        fr: document.getElementById("efAliasFr").value.trim() || newCode,
+      },
+      account_name: document.getElementById("efAccountName").value.trim(),
+      bank_name: document.getElementById("efBankName").value.trim(),
+      holder_name: document.getElementById("efHolderName").value.trim(),
+      account_number: document.getElementById("efAccountNumber").value.trim(),
+      default_currency: document.getElementById("efDefaultCurrency").value,
+      supported_currencies: [...document.querySelectorAll("#efSupportedCurrencies input:checked")].map((cb) => cb.value),
+    };
+
+    let accounts = [...state.data.accounts];
+    if (isNew) {
+      if (accounts.find((a) => a.account_code === newCode)) { showToast(t("toast.codeDuplicate")); return; }
+      accounts.push(newAcc);
+    } else {
+      accounts = accounts.map((a) => a.account_code === code ? newAcc : a);
+    }
+    saveAccountsToServer(accounts);
+  } else {
+    const newCode = document.getElementById("efCurrencyCode").value.trim();
+    const newIso = document.getElementById("efCurrencyIso").value.trim().toUpperCase();
+    if (!newCode || !newIso) { showToast(t("toast.codeRequired")); return; }
+
+    const newCur = {
+      currency_code: newCode,
+      currency_iso: newIso,
+      alias: {
+        zh: document.getElementById("efCurAliasZh").value.trim() || newIso,
+        en: document.getElementById("efCurAliasEn").value.trim() || newIso,
+        fr: document.getElementById("efCurAliasFr").value.trim() || newIso,
+      },
+      currency_symbol: document.getElementById("efCurrencySymbol").value.trim() || newIso,
+    };
+
+    let currencies = [...state.data.currencies];
+    if (isNew) {
+      if (currencies.find((c) => c.currency_code === newCode)) { showToast(t("toast.codeDuplicate")); return; }
+      currencies.push(newCur);
+    } else {
+      currencies = currencies.map((c) => c.currency_code === code ? newCur : c);
+    }
+    saveCurrenciesToServer(currencies);
+  }
+}
+
+function deleteEditConfig() {
+  if (!editConfigTarget) return;
+  const { type, code } = editConfigTarget;
+  if (!code) return;
+
+  if (type === "account") {
+    const accounts = state.data.accounts.filter((a) => a.account_code !== code);
+    saveAccountsToServer(accounts);
+  } else {
+    const currencies = state.data.currencies.filter((c) => c.currency_code !== code);
+    saveCurrenciesToServer(currencies);
+  }
+}
+
+async function saveAccountsToServer(accounts) {
+  try {
+    const res = await fetch(`/${USER_ID}/api/config/accounts`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(accounts),
+    });
+    if (!res.ok) throw new Error();
+    state.data.accounts = accounts;
+    showToast(t("toast.configSaved"));
+    closeEditConfig();
+    renderAccountsList();
+  } catch {
+    showToast(t("toast.configSaveFailed"));
+  }
+}
+
+async function saveCurrenciesToServer(currencies) {
+  try {
+    const res = await fetch(`/${USER_ID}/api/config/currencies`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(currencies),
+    });
+    if (!res.ok) throw new Error();
+    state.data.currencies = currencies;
+    showToast(t("toast.configSaved"));
+    closeEditConfig();
+    renderCurrenciesList();
+  } catch {
+    showToast(t("toast.configSaveFailed"));
+  }
+}
+
 document.addEventListener("click", (event) => {
   const themeOption = event.target.closest(".theme-option");
   if (themeOption) {
@@ -380,15 +628,37 @@ document.addEventListener("click", (event) => {
 async function init() {
   try {
     applyTheme(state.theme);
-    const [accounts, currencies, dailySeries, staticCharts, transactions, currencyBreakdown, fxRates, multiLang] = await Promise.all([
-      fetchJson(DATA_PATHS.accounts),
-      fetchJson(DATA_PATHS.currencies),
-      fetchJson(DATA_PATHS.dailySeries),
-      fetchJson(DATA_PATHS.staticCharts),
-      fetchJson(DATA_PATHS.transactions),
+
+    // Try loading multi-lang first (always available, shared asset)
+    const multiLang = await fetchJson(DATA_PATHS.multiLang).catch(() => ({}));
+    state.data.translations = multiLang;
+    applyLanguage();
+
+    // Try loading config files — if accounts.json 404s, this is a new user
+    let accounts = null;
+    let currencies = null;
+    try {
+      [accounts, currencies] = await Promise.all([
+        fetchJson(DATA_PATHS.accounts),
+        fetchJson(DATA_PATHS.currencies),
+      ]);
+    } catch {
+      // New user — no config files yet
+    }
+
+    if (!accounts || accounts.length === 0) {
+      // New user: show onboarding
+      showOnboarding(currencies || []);
+      return;
+    }
+
+    // Existing user: load everything
+    const [dailySeries, staticCharts, transactions, currencyBreakdown, fxRates] = await Promise.all([
+      fetchJson(DATA_PATHS.dailySeries).catch(() => ({})),
+      fetchJson(DATA_PATHS.staticCharts).catch(() => ({})),
+      fetchJson(DATA_PATHS.transactions).catch(() => ({ default: { total: { transactions: [] } } })),
       fetchJson(DATA_PATHS.currencyBreakdown).catch(() => ({})),
       fetchJson(DATA_PATHS.fxRates).catch(() => ({ rates: {} })),
-      fetchJson(DATA_PATHS.multiLang).catch(() => ({}))
     ]);
 
     state.data.accounts = accounts;
@@ -398,13 +668,11 @@ async function init() {
     state.data.transactions = transactions;
     state.data.currencyBreakdown = currencyBreakdown;
     state.data.fxRates = fxRates.rates || {};
-    state.data.translations = multiLang;
 
     buildAccountList();
     bindEvents();
     initCharts();
     setInitialSelections();
-    applyLanguage();
     updateAll();
     revealCards();
     createTxTooltip();
@@ -421,6 +689,180 @@ function fetchJson(path) {
     }
     return response.json();
   });
+}
+
+// ---------------------------------------------------------------------------
+// Onboarding
+// ---------------------------------------------------------------------------
+
+const ONBOARDING_DEFAULT_CURRENCIES = [
+  { currency_code: "01", currency_iso: "CNY", alias: { zh: "人民币", en: "Chinese Yuan", fr: "Yuan chinois" }, currency_symbol: "￥" },
+  { currency_code: "02", currency_iso: "HKD", alias: { zh: "港币", en: "Hong Kong Dollar", fr: "Dollar hongkongais" }, currency_symbol: "HK$" },
+  { currency_code: "03", currency_iso: "EUR", alias: { zh: "欧元", en: "Euro", fr: "Euro" }, currency_symbol: "€" },
+  { currency_code: "04", currency_iso: "USD", alias: { zh: "美元", en: "US Dollar", fr: "Dollar américain" }, currency_symbol: "$" },
+  { currency_code: "05", currency_iso: "JPY", alias: { zh: "日元", en: "Japanese Yen", fr: "Yen japonais" }, currency_symbol: "¥" },
+];
+
+let obState = { step: 1, selectedCurrency: "01", files: [] };
+
+function showOnboarding(currencies) {
+  const overlay = document.getElementById("onboardingOverlay");
+  if (!overlay) return;
+  overlay.style.display = "";
+
+  const currs = currencies && currencies.length ? currencies : ONBOARDING_DEFAULT_CURRENCIES;
+
+  // Build currency grid
+  const grid = document.getElementById("onboardingCurrencyGrid");
+  grid.innerHTML = "";
+  currs.forEach((c) => {
+    const btn = document.createElement("button");
+    btn.className = "onboarding-currency-btn" + (c.currency_code === obState.selectedCurrency ? " is-selected" : "");
+    btn.dataset.code = c.currency_code;
+    const alias = c.alias || {};
+    const label = alias[state.language] || alias.en || c.currency_iso;
+    btn.innerHTML = `<span class="onboarding-currency-symbol">${escapeHtml(c.currency_symbol)}</span>${escapeHtml(label)}`;
+    btn.addEventListener("click", () => {
+      grid.querySelectorAll(".onboarding-currency-btn").forEach((b) => b.classList.remove("is-selected"));
+      btn.classList.add("is-selected");
+      obState.selectedCurrency = c.currency_code;
+    });
+    grid.appendChild(btn);
+  });
+
+  // Upload zone
+  const uploadZone = document.getElementById("obUploadZone");
+  const fileInput = document.getElementById("obFileInput");
+  uploadZone.addEventListener("click", () => fileInput.click());
+  uploadZone.addEventListener("dragover", (e) => { e.preventDefault(); uploadZone.style.borderColor = "var(--rausch)"; });
+  uploadZone.addEventListener("dragleave", () => { uploadZone.style.borderColor = ""; });
+  uploadZone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    uploadZone.style.borderColor = "";
+    obState.files = [...(e.dataTransfer.files || [])];
+    renderObFileList();
+  });
+  fileInput.addEventListener("change", () => {
+    obState.files = [...fileInput.files];
+    renderObFileList();
+  });
+
+  // Step navigation
+  document.getElementById("obNext").addEventListener("click", obNext);
+  document.getElementById("obBack").addEventListener("click", obBack);
+  document.getElementById("obSkip").addEventListener("click", obSkip);
+
+  obUpdateUI();
+}
+
+function renderObFileList() {
+  const list = document.getElementById("obFileList");
+  const zone = document.getElementById("obUploadZone");
+  if (!obState.files.length) {
+    list.innerHTML = "";
+    zone.classList.remove("has-files");
+    return;
+  }
+  zone.classList.add("has-files");
+  list.innerHTML = [...obState.files].map((f) => `<div class="onboarding-file-item">📄 ${escapeHtml(f.name)}</div>`).join("");
+}
+
+function obUpdateUI() {
+  const { step } = obState;
+  // Steps
+  document.querySelectorAll(".onboarding-step").forEach((el) => {
+    const s = parseInt(el.dataset.step);
+    el.classList.toggle("is-active", s === step);
+    el.classList.toggle("is-done", s < step);
+  });
+  // Panels
+  document.querySelectorAll(".onboarding-panel").forEach((el) => {
+    el.classList.toggle("is-active", parseInt(el.dataset.panel) === step);
+  });
+  // Buttons
+  document.getElementById("obBack").style.display = step > 1 ? "" : "none";
+  document.getElementById("obSkip").textContent = step === 3 ? t("onboarding.finish") : t("onboarding.skip");
+  const nextBtn = document.getElementById("obNext");
+  nextBtn.textContent = step === 3 ? t("onboarding.setupAndGo") : t("onboarding.next");
+}
+
+function obNext() {
+  if (obState.step < 3) {
+    obState.step++;
+    obUpdateUI();
+    return;
+  }
+  // Final step: call setup API, upload files, then reload
+  obFinish();
+}
+
+function obBack() {
+  if (obState.step > 1) {
+    obState.step--;
+    obUpdateUI();
+  }
+}
+
+async function obSkip() {
+  if (obState.step < 3) {
+    // Skip to finish with minimal config
+    await obFinish();
+  } else {
+    // On step 3, skip means finish without uploading
+    await obFinish();
+  }
+}
+
+async function obFinish() {
+  const nextBtn = document.getElementById("obNext");
+  nextBtn.disabled = true;
+  nextBtn.textContent = "...";
+
+  const bankName = (document.getElementById("obBankName")?.value || "").trim();
+  const accountName = (document.getElementById("obAccountName")?.value || "").trim();
+  const holderName = (document.getElementById("obHolderName")?.value || "").trim();
+  const accountNumber = (document.getElementById("obAccountNumber")?.value || "").trim();
+
+  // Build account data
+  const accountCode = "001";
+  const accountAlias = accountName || bankName || "Account 1";
+  const account = {
+    account_code: accountCode,
+    alias: { zh: accountAlias, en: accountAlias, fr: accountAlias },
+    account_name: accountName || bankName || "Account 1",
+    bank_name: bankName,
+    holder_name: holderName,
+    account_number: accountNumber,
+    default_currency: obState.selectedCurrency,
+    supported_currencies: [obState.selectedCurrency],
+  };
+
+  try {
+    // Call setup API
+    await fetch(`/${USER_ID}/api/setup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        default_currency: obState.selectedCurrency,
+        account: account,
+      }),
+    });
+
+    // Upload files if any
+    if (obState.files.length) {
+      const formData = new FormData();
+      for (const file of obState.files) formData.append("files", file);
+      await fetch(`/${USER_ID}/api/upload`, { method: "POST", body: formData });
+    }
+
+    // Reload to show the dashboard
+    location.reload();
+  } catch (err) {
+    console.error("Setup failed:", err);
+    showToast(t("toast.setupFailed"));
+    nextBtn.disabled = false;
+    nextBtn.textContent = t("onboarding.setupAndGo");
+  }
 }
 
 function buildAccountList() {
@@ -586,6 +1028,43 @@ function bindEvents() {
   dom.closeNotificationModal.addEventListener("click", closeNotificationModal);
   dom.notificationModal.addEventListener("click", (event) => {
     if (event.target === dom.notificationModal) closeNotificationModal();
+  });
+
+  // Config management — settings buttons open the list modal
+  dom.manageAccountsBtn.addEventListener("click", () => {
+    closeSettingsModal();
+    openConfigListModal("accounts");
+  });
+  dom.manageCurrenciesBtn.addEventListener("click", () => {
+    closeSettingsModal();
+    openConfigListModal("currencies");
+  });
+
+  // Config list modal
+  dom.closeConfigListModal.addEventListener("click", closeConfigList);
+  dom.configListModal.addEventListener("click", (e) => {
+    if (e.target === dom.configListModal) closeConfigList();
+    const tab = e.target.closest(".config-tab");
+    if (tab) switchConfigTab(tab.dataset.tab);
+  });
+  dom.addAccountBtn.addEventListener("click", () => openEditConfigModal("account", null));
+  dom.addCurrencyBtn.addEventListener("click", () => openEditConfigModal("currency", null));
+  dom.accountsList.addEventListener("click", (e) => {
+    const btn = e.target.closest(".config-item-edit");
+    if (btn) openEditConfigModal("account", btn.dataset.code);
+  });
+  dom.currenciesList.addEventListener("click", (e) => {
+    const btn = e.target.closest(".config-item-edit");
+    if (btn) openEditConfigModal("currency", btn.dataset.code);
+  });
+
+  // Edit config modal
+  dom.saveEditConfig.addEventListener("click", saveEditConfig);
+  dom.cancelEditConfig.addEventListener("click", closeEditConfig);
+  dom.closeEditConfigModal.addEventListener("click", closeEditConfig);
+  dom.deleteConfigBtn.addEventListener("click", deleteEditConfig);
+  dom.editConfigModal.addEventListener("click", (event) => {
+    if (event.target === dom.editConfigModal) closeEditConfig();
   });
 
   bindTxTooltipEvents(dom.transactionsList);

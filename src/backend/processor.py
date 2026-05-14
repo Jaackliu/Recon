@@ -598,9 +598,8 @@ def build_dataset(
 
 
 def main() -> None:
-    from path_config import ROOT, DATA_DIR, DB_DIR, UI_DIR, LOG_DIR, CONFIG_DIR
+    from path_config import DATA_DIR, DB_DIR, UI_DIR, LOG_DIR, CONFIG_DIR
 
-    settings_path = ROOT / "settings.json"
     currency_path = CONFIG_DIR / "currency.json"
     fx_rate_path = DB_DIR / "fx_rate.json"
 
@@ -648,19 +647,14 @@ def main() -> None:
         fx_payload = load_json(fx_rate_path)
         fx_rates = fx_payload.get("rates", {})
 
-    settings: Dict[str, Any] = {}
-    if settings_path.exists():
-        settings = load_json(settings_path)
-
-    global_default_currency = settings.get("global_default_currency")
+    # Determine processor default currency from accounts (first account's default)
+    global_default_currency = None
+    if account_defaults:
+        global_default_currency = next(iter(account_defaults.values()))
+    if not global_default_currency and currencies_raw:
+        global_default_currency = currencies_raw[0].get("currency_code")
     if not global_default_currency:
-        if account_defaults:
-            global_default_currency = next(iter(account_defaults.values()))
-        elif currencies_raw:
-            global_default_currency = currencies_raw[0].get("currency_code")
-
-    if not global_default_currency:
-        logger.error("Missing global default currency setting.")
+        logger.error("Cannot determine default currency.")
         return
 
     if not fx_rates:

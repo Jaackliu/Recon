@@ -24,8 +24,6 @@ from path_config import ROOT, DB_DIR, LOG_DIR, CONFIG_DIR, RAW_INPUT_DIR
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-MODEL = "mimo-v2.5"
-BASE_URL = "https://token-plan-cn.xiaomimimo.com/anthropic"
 DPI = 200
 MAX_RETRIES = 3
 RETRY_DELAY = 5
@@ -110,6 +108,7 @@ def _call_ai_with_retry(
     images: List[str],
     logger: logging.Logger,
     group_label: str,
+    model: str,
     is_last_single_page: bool = False,
 ) -> Tuple[Optional[List[Dict[str, Any]]], bool]:
     """Call AI for one image group with up to MAX_RETRIES attempts.
@@ -123,7 +122,7 @@ def _call_ai_with_retry(
     last_was_no_txns = False
     for attempt in range(1, MAX_RETRIES + 1):
         logger.debug("%s attempt %d/%d", group_label, attempt, MAX_RETRIES)
-        response_text = call_ai(client, system_prompt, images, logger)
+        response_text = call_ai(client, system_prompt, images, logger, model)
         if not response_text:
             logger.error("%s attempt %d: API error (no response)", group_label, attempt)
             last_was_no_txns = False
@@ -141,8 +140,8 @@ def _call_ai_with_retry(
     return None, False
 
 
-def _call_ai_worker(args: Tuple[int, int, int, List[str], str, str, str]) -> Tuple[int, Optional[List[Dict[str, Any]]], bool]:
-    gi, total_groups, total_pages, group, system_prompt, api_key, base_url = args
+def _call_ai_worker(args: Tuple[int, int, int, List[str], str, str, str, str]) -> Tuple[int, Optional[List[Dict[str, Any]]], bool]:
+    gi, total_groups, total_pages, group, system_prompt, api_key, base_url, model = args
     client = Anthropic(api_key=api_key, base_url=base_url)
     logger = setup_logger()
     is_last = gi == total_groups - 1
@@ -150,7 +149,7 @@ def _call_ai_worker(args: Tuple[int, int, int, List[str], str, str, str]) -> Tup
     label = "Worker group %d/%d (%d images)" % (gi + 1, total_groups, len(group))
     logger.debug(label)
     return gi, *_call_ai_with_retry(
-        client, system_prompt, group, logger, label,
+        client, system_prompt, group, logger, label, model,
         is_last_single_page=(is_last and is_single_page),
     )
 
@@ -189,6 +188,7 @@ def call_ai(
     system_prompt: str,
     images: List[str],
     logger: logging.Logger,
+    model: str,
 ) -> Optional[str]:
     content: List[Dict[str, Any]] = []
     for i, b64 in enumerate(images):
@@ -209,7 +209,7 @@ def call_ai(
         try:
             logger.debug("API call attempt %d/%d (%d pages)", attempt, MAX_RETRIES, len(images))
             message = client.messages.create(
-                model=MODEL,
+                model=model,
                 max_tokens=20480,
                 system=system_prompt,
                 messages=[{"role": "user", "content": content}],
@@ -233,6 +233,8 @@ def call_ai_grouped(
     images: List[str],
     logger: logging.Logger,
     api_key: str,
+    model: str,
+    base_url: str,
 ) -> Optional[str]:
     groups = split_images_into_groups(images)
     total_pages = len(images)
@@ -242,7 +244,7 @@ def call_ai_grouped(
         is_single_page = total_pages == 1
         txns, valid_empty = _call_ai_with_retry(
             client, system_prompt, groups[0], logger,
-            "Single group (%d images)" % total_pages,
+            "Single group (%d images)" % total_pages, model,
             is_last_single_page=is_single_page,
         )
         if txns is None:
@@ -254,7 +256,7 @@ def call_ai_grouped(
                  total_pages, len(groups), IMAGE_GROUP_SIZE, MAX_WORKERS)
 
     tasks = [
-        (gi, len(groups), total_pages, group, system_prompt, api_key, BASE_URL)
+        (gi, len(groups), total_pages, group, system_prompt, api_key, base_url, model)
         for gi, group in enumerate(groups)
     ]
 
@@ -435,6 +437,8 @@ def parse_pdf(
     system_prompt: str,
     client: Anthropic,
     api_key: str,
+    model: str,
+    base_url: str,
     seq_map: Dict[Tuple[str, str], int],
     logger: logging.Logger,
     processed_at: str,
@@ -446,7 +450,7 @@ def parse_pdf(
         logger.error("Failed to render PDF %s: %s", pdf_path.name, exc)
         return [], None
 
-    response_text = call_ai_grouped(client, system_prompt, images, logger, api_key)
+    response_text = call_ai_grouped(client, system_prompt, images, logger, api_key, model, base_url)
     if not response_text:
         logger.error("No response from AI for %s", pdf_path.name)
         return [], None
@@ -492,6 +496,8 @@ def run_balance_check_and_reparse(
     system_prompt: str,
     client: Anthropic,
     api_key: str,
+    model: str,
+    base_url: str,
     logger: logging.Logger,
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     for attempt in range(1, BALANCE_CHECK_MAX_RETRIES + 1):
@@ -553,6 +559,8 @@ def run_balance_check_and_reparse(
                 system_prompt,
                 client,
                 api_key,
+                model,
+                base_url,
                 seq_map,
                 logger,
                 processed_at,
@@ -634,11 +642,19 @@ def main() -> None:
     import os
     from dotenv import load_dotenv
     load_dotenv(ROOT / ".env")
-    api_key = os.environ.get("MIMO_API_KEY")
+    api_key = os.environ.get("AI_API_KEY")
+    base_url = os.environ.get("AI_BASE_URL")
+    model = os.environ.get("AI_MODEL")
     if not api_key:
-        logger.error("MIMO_API_KEY not set in .env")
+        logger.error("AI_API_KEY not set in .env")
         return
-    client = Anthropic(api_key=api_key, base_url=BASE_URL)
+    if not base_url:
+        logger.error("AI_BASE_URL not set in .env")
+        return
+    if not model:
+        logger.error("AI_MODEL not set in .env")
+        return
+    client = Anthropic(api_key=api_key, base_url=base_url)
 
     processed_at = datetime.now(TZ_CST).isoformat()
     seq_map = build_seq_map(transactions)
@@ -653,6 +669,8 @@ def main() -> None:
             system_prompt,
             client,
             api_key,
+            model,
+            base_url,
             seq_map,
             logger,
             processed_at,
@@ -687,6 +705,8 @@ def main() -> None:
         system_prompt,
         client,
         api_key,
+        model,
+        base_url,
         logger,
     )
 

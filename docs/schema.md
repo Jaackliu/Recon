@@ -33,15 +33,6 @@
 | **货币清单** | `currencies` | Array[Object] | 与 `currency.json` 一致的币种清单，每个对象必须包含 `currency_code`、`currency_iso`、`alias`、`currency_symbol`。 |
 | **汇率矩阵** | `rates` | Object | 以 `currency_code` 为键的嵌套对象。`rates[A][B]` 表示 A→B 的汇率，**必须包含所有币种两两组合**，同币种汇率为 `1.0`，数值为四舍五入保留 6 位小数的 Float。 |
 
-### 1.2 `settings.json` (全局设置)
-本文件由人工手动维护，用于保存全局级别的配置。当前仅用于定义全局默认币种。
-
-结构为 JSON 对象，包含以下字段：
-
-| 字段名 | 键名 (Key) | 数据类型 | 说明 / 约束 |
-| :--- | :--- | :--- | :--- |
-| **全局默认币种** | `global_default_currency` | String | 取值必须为 `data/config/currency.json` 中已定义的 `currency_code`。当选择”总资产 + 默认币种”时，使用该币种作为统一显示币种。 |
-
 ### 2. `accounts.json` (银行账户配置)
 本文件位于 `data/config/accounts.json`，由人工手动维护（后端手动新增，前端与 AI API 无权新增）。AI API 解析账单时必须引入此文件作为 Prompt 上下文，以确保识别出的账户代码完全合法。
 
