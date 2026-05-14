@@ -1,6 +1,6 @@
 const DATA_PATHS = {
-  accounts: "../../data/database/accounts.json",
-  currencies: "../../data/database/currency.json",
+  accounts: "../../data/config/accounts.json",
+  currencies: "../../data/config/currency.json",
   dailySeries: "../../data/ui/ui_daily_series.json",
   staticCharts: "../../data/ui/ui_static_charts.json",
   transactions: "../../data/ui/ui_transactions_and_categories.json",

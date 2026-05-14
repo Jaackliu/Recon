@@ -577,12 +577,13 @@ def main() -> None:
     ui_dir = data_dir / "ui"
     log_dir = data_dir / "logs"
     settings_path = repo_root / "settings.json"
-    currency_path = db_dir / "currency.json"
+    config_dir = data_dir / "config"
+    currency_path = config_dir / "currency.json"
     fx_rate_path = db_dir / "fx_rate.json"
 
     logger = setup_logger(log_dir / "processor.log")
 
-    accounts_path = db_dir / "accounts.json"
+    accounts_path = config_dir / "accounts.json"
     transactions_path = db_dir / "transactions.json"
 
     if not transactions_path.exists():

@@ -6,10 +6,10 @@
 
 ## 一、 核心数据模型 (Schemas)
 
-所有 JSON 数据文件均要求严格的格式规范，**任何字段都不允许出现空值 (null/undefined)**。系统支持的币种以 `currency.json` 为准，交易与账户字段只使用货币代码。
+所有 JSON 数据文件均要求严格的格式规范，**任何字段都不允许出现空值 (null/undefined)**。系统支持的币种以 `data/config/currency.json` 为准，交易与账户字段只使用货币代码。
 
 ### 1. `currency.json` (货币配置)
-本文件由人工手动维护（后端手动新增，前端与 AI API 无权新增），记录系统支持的所有货币类型。
+本文件位于 `data/config/currency.json`，由人工手动维护（后端手动新增，前端与 AI API 无权新增），记录系统支持的所有货币类型。
 
 结构为 JSON 数组，每个对象包含以下字段：
 
@@ -21,7 +21,7 @@
 | **货币符号** | `currency_symbol` | String | 用于前端显示（例："￥"、"$"、"HK$"）。 |
 
 ### 1.1 `fx_rate.json` (汇率矩阵)
-本文件由 `fetch_fx.py` 生成，记录 `currency.json` 中所有币种之间的全量汇率矩阵，便于后续跨币种计算。
+本文件由 `fetch_fx.py` 生成，记录 `data/config/currency.json` 中所有币种之间的全量汇率矩阵，便于后续跨币种计算。
 
 结构为 JSON 对象，包含以下字段：
 
@@ -40,10 +40,10 @@
 
 | 字段名 | 键名 (Key) | 数据类型 | 说明 / 约束 |
 | :--- | :--- | :--- | :--- |
-| **全局默认币种** | `global_default_currency` | String | 取值必须为 `currency.json` 中已定义的 `currency_code`。当选择“总资产 + 默认币种”时，使用该币种作为统一显示币种。 |
+| **全局默认币种** | `global_default_currency` | String | 取值必须为 `data/config/currency.json` 中已定义的 `currency_code`。当选择”总资产 + 默认币种”时，使用该币种作为统一显示币种。 |
 
 ### 2. `accounts.json` (银行账户配置)
-本文件由人工手动维护（后端手动新增，前端与 AI API 无权新增）。AI API 解析账单时必须引入此文件作为 Prompt 上下文，以确保识别出的账户代码完全合法。
+本文件位于 `data/config/accounts.json`，由人工手动维护（后端手动新增，前端与 AI API 无权新增）。AI API 解析账单时必须引入此文件作为 Prompt 上下文，以确保识别出的账户代码完全合法。
 
 结构为 JSON 数组，每个对象包含以下字段：
 
@@ -55,8 +55,8 @@
 | **发行银行** | `bank_name` | String | 发卡行名称（例："招商银行"）。 |
 | **账号** | `account_number` | String | 银行卡号或统一账号。 |
 | **持有人名称** | `holder_name` | String | 账户持有人姓名。 |
-| **默认币种代码** | `default_currency` | String | `currency.json` 中已定义的 `currency_code`。 |
-| **支持币种代码** | `supported_currencies`| Array[String] | 包含支持的币种代码数组，元素必须为 `currency.json` 中已定义的 `currency_code`。 |
+| **默认币种代码** | `default_currency` | String | `data/config/currency.json` 中已定义的 `currency_code`。 |
+| **支持币种代码** | `supported_currencies`| Array[String] | 包含支持的币种代码数组，元素必须为 `data/config/currency.json` 中已定义的 `currency_code`。 |
 
 ### 3. `transactions.json` (交易记录流水)
 本文件存储所有的历史交易明细。由 AI API 解析账单生成初始数据，再由后端 Python 脚本（`parser.py`）清洗、拼接和重写字段后追加保存。
@@ -67,10 +67,10 @@
 | :--- | :--- | :--- | :--- | :--- |
 | **交易 ID** | `transaction_id` | String | Python | **主键**。格式：`TX-{银行账户代码}-{YYYYMMDD}-{当日三位交易序数}`。 |
 | **交易日期** | `date` | String | AI API | 格式约定为 `YYYY-MM-DD`。 |
-| **银行账户代码** | `account_code` | String | AI API | 必须是 `accounts.json` 中已存在的代码。 |
+| **银行账户代码** | `account_code` | String | AI API | 必须是 `data/config/accounts.json` 中已存在的代码。 |
 | **交易类型代码** | `type_code` | Integer | AI / Python | **1**: 收入, **2**: 支出 (AI 初始识别仅限 1 和 2)。<br>**3**: 撤销/报销, **4**: 内部转账 (由 Python 后期逻辑覆写)。 |
 | **现金流方向** | `cashflow_direction` | Integer | Python | **1**: 流入, **2**: 流出。由 AI 初始 `type_code` 在解析完成后立即写入，后续撤销/报销与内部转账识别 **只改 `type_code` 不改此字段**。现金流所有计算以此字段为准。 |
-| **货币代码** | `currency` | String | AI API | 必须为 `currency.json` 中已定义的 `currency_code`，且必须在对应账户的 `supported_currencies` 中。 |
+| **货币代码** | `currency` | String | AI API | 必须为 `data/config/currency.json` 中已定义的 `currency_code`，且必须在对应账户的 `supported_currencies` 中。 |
 | **金额** | `amount` | Float | AI API | 交易绝对值金额（正数）。 |
 | **帐户余额** | `balance` | Float | AI API | 交易后的账户余额。 |
 | **收支类别** | `category` | String | AI API | **必须严格匹配系统设定的枚举值**（详见下文枚举规范），不可无类别。 |
@@ -149,7 +149,7 @@ AI 提取交易并完成字段校验后，Python 必须为每条交易写入 `ca
 ## 三、 架构分工与工程约束
 
 ### 1. 模块职责
-*   **AI API 交互层**：通过单一的 TXT Prompt（包含业务说明、`accounts.json` 与 `currency.json` 货币图例），让 AI 同时完成 PDF 读取和中间 JSON 提取。
+*   **AI API 交互层**：通过单一的 TXT Prompt（包含业务说明、`data/config/accounts.json` 与 `data/config/currency.json` 货币图例），让 AI 同时完成 PDF 读取和中间 JSON 提取。
 *   **`parser.py` (数据入库引擎)**：
     *   调用 AI API 并接收初步解析结果。
     *   校验单 PDF 单账户原则。

@@ -12,7 +12,8 @@ ROOT = Path(__file__).resolve().parents[2]
 DB_DIR = ROOT / "data" / "database"
 LOG_DIR = ROOT / "data" / "logs"
 
-CURRENCY_PATH = DB_DIR / "currency.json"
+CONFIG_DIR = ROOT / "data" / "config"
+CURRENCY_PATH = CONFIG_DIR / "currency.json"
 FX_RATE_PATH = DB_DIR / "fx_rate.json"
 
 

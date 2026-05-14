@@ -74,6 +74,12 @@
 - **Bug fix**: Changing the default currency in settings now correctly converts all amounts using FX rates, not just the display symbol. The frontend loads `fx_rate.json` and applies runtime conversion to the `"default"` dataset when the user's selected currency differs from the processor's `global_default_currency` (written as `_meta.processor_default_currency` in UI JSON files). Also fixed currency breakdown display to use each currency's native symbol.
 - **Bug fix 2**: Fixed two issues in the FX conversion: (1) the conversion cache used a single global key that didn't distinguish between different collections (dailySeries/staticCharts/transactions), causing modules C-G to show wrong data; replaced with per-collection WeakMap cache. (2) `convertItem` didn't recursively convert nested arrays/objects (e.g., `heatmap[].net_inflow`, `monthly_combo[].end_balance`); replaced with `convertValue` that recursively traverses all nested structures.
 
+## 2026-05-14
+- Moved `accounts.json` and `currency.json` from `data/database/` to `data/config/` to separate hand-maintained config files from generated data files.
+- Updated all code path references: `parser.py`, `fetch_fx.py`, `processor.py`, `app.js`.
+- Updated documentation references in `schema.md`, `process.md`, `frontend.md`.
+- Updated `.claude/settings.local.json` permission allowlists.
+
 ## Plan
 
 - [x] Implement src/backend/processor.py to generate UI JSON files.

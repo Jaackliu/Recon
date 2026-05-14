@@ -39,8 +39,9 @@ DB_DIR = ROOT / "data" / "database"
 LOG_DIR = ROOT / "data" / "logs"
 PROMPT_PATH = Path(__file__).resolve().parent / "prompts" / "parse_transactions.txt"
 
-ACCOUNTS_PATH = DB_DIR / "accounts.json"
-CURRENCY_PATH = DB_DIR / "currency.json"
+CONFIG_DIR = ROOT / "data" / "config"
+ACCOUNTS_PATH = CONFIG_DIR / "accounts.json"
+CURRENCY_PATH = CONFIG_DIR / "currency.json"
 TRANSACTIONS_PATH = DB_DIR / "transactions.json"
 PARSED_PATH = DB_DIR / "parsed.json"
 

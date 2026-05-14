@@ -36,7 +36,7 @@
 左侧栏为全局筛选器，其状态变更将触发整个 Dashboard 或 Transactions 页面的数据重绘（明确标注不受影响的图表除外）。由于前端不进行复杂数据计算，这里的筛选本质上是对后端提供的全量预计算数据进行前端视角的截取和组装。
 
 ### 1. 账户选择器 (Account Selector)
-*   **选项**：包含“总资产 (Total Asset)”以及 `accounts.json` 中定义的所有特定银行账户列表。
+*   **选项**：包含”总资产 (Total Asset)”以及 `data/config/accounts.json` 中定义的所有特定银行账户列表。
 *   **计算逻辑契约**：
     *   选择“总资产”时：各项指标（总余额、总收支等）以及所有图表数据，必须是所有单独账户对应项的**直接加和**。
     *   注意：由于跨账户“内部转账”的收入和支出在总额计算时会自动相互抵消，总资产视图下不会凭空产生专门的虚拟账户或虚假交易，只需严格执行加和逻辑即可。
@@ -47,9 +47,9 @@
 *   **选项来源**：
     *   当选择“总资产”时：允许选择“默认”以及所有账户 `supported_currencies` 的并集。
     *   当选择特定账户时：允许选择“默认”以及该账户的 `supported_currencies`。
-*   **展示文本**：具体币种选项使用 `currency.json` 的 `currency_name` 字段展示。
+*   **展示文本**：具体币种选项使用 `data/config/currency.json` 的 `currency_name` 字段展示。
 *   **默认币种语义**：
-    *   **特定账户 + 默认**：使用该账户在 `accounts.json` 中的 `default_currency` 视角。
+    *   **特定账户 + 默认**：使用该账户在 `data/config/accounts.json` 中的 `default_currency` 视角。
     *   **总资产 + 默认**：使用 `settings.json` 的 `global_default_currency` 视角。
 *   **数据绑定契约**：
     *   “默认”使用后端输出的 `default` / `default_local` 数据集。
@@ -68,7 +68,7 @@
 *   **UI 形式**：带有齿轮图标的按钮，点击后打开设置弹窗。
 *   **设置弹窗内容**：
     *   **主题选择 (Appearance)**：提供三个选项 - “System”（跟随系统）、”Light”（浅色模式）、”Dark”（深色模式）。
-    *   **默认货币选择 (Default Currency)**：显示所有可用货币选项，使用 `currency.json` 的 `currency_symbol` 和 `currency_name` 展示。
+    *   **默认货币选择 (Default Currency)**：显示所有可用货币选项，使用 `data/config/currency.json` 的 `currency_symbol` 和 `currency_name` 展示。
 *   **数据持久化**：
     *   主题设置保存到 `localStorage` 的 `theme` 键。
     *   默认货币设置保存到 `localStorage` 的 `defaultCurrency` 键。

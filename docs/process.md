@@ -14,7 +14,7 @@
 ### 0. 币种语义与汇率转换 (Multi-Currency Context)
 为了支持前端货币选择器，处理引擎必须提供两类数据视角：
 *   **默认币种视角 (Converted)**：
-  *   **单账户视角**：使用 `accounts.json` 的 `default_currency` 作为目标币种。
+  *   **单账户视角**：使用 `data/config/accounts.json` 的 `default_currency` 作为目标币种。
   *   **总资产视角**：使用 `settings.json` 的 `global_default_currency` 作为目标币种。
   *   所有其他币种的交易，全部依据 `fx_rate.json` 的矩阵汇率 **一次性转换** 为目标币种。
   *   **余额与现金流汇总**：按币种分别生成每日序列并前向填充，再将所有币种的每日余额/现金流转换后求和，作为默认币种视角的每日结果。
