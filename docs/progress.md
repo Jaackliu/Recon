@@ -114,6 +114,29 @@
 - 样式：`.transaction-row:hover` / `.detail-row:hover` 高亮 + `#txTooltip` 浮窗
 - 文档：更新 `process.md` schema、`frontend.md` 各模块交互说明
 
+## 2026-05-14 (多语言支持 i18n)
+- 新增 `src/frontend/multi-lang.json`：包含 zh/en/fr 三种语言的完整翻译字典
+- 前端 i18n 系统：
+  - `app.js` 新增 `t()`、`getAlias()`、`translateCategory()`、`untranslateCategory()`、`getDirectionLabel()` 辅助函数
+  - 所有 UI 文本通过 `data-i18n` 属性标记，语言切换时即时更新
+  - Settings 弹窗新增语言选择器（中文/English/Français）
+  - 语言设置保存到 `localStorage` 的 `language` 键，默认 `"zh"`
+  - 桑基图、甜甜圈图等图表的标签和类别名称支持翻译
+  - Tooltip 字段标签支持翻译
+  - 日历热力图月份名称跟随语言设置
+- 后端类别迁移：
+  - `parse_transactions.txt`：类别枚举从中文改为英文（Food, Transportation 等）
+  - `parser.py`：默认类别从 `"其他"` 改为 `"Other"`
+  - `detect_reclassify.py`：手续费交易类别从 `"其他"` 改为 `"Other"`
+  - 新增 `migrate_categories.py`：一次性迁移脚本，将 transactions.json 中的中文类别转为英文
+- 配置文件多语言别名：
+  - `accounts.json`：`alias` 从字符串改为 `{zh, en, fr}` 对象
+  - `currency.json`：`alias` 从字符串改为 `{zh, en, fr}` 对象
+  - `fetch_fx.py`：适配对象格式的 alias（直接传递）
+  - `processor.py`：alias 对象直接传递到 UI JSON，前端通过 `getAlias()` 提取
+- 样式：新增 `.language-selector`、`.language-option`、`.lang-icon` 样式，CJK 字体回退
+- 文档：更新 `schema.md`（alias 类型、类别枚举）、`process.md`（JSON 示例）、`frontend.md`（语言选择器）
+
 ## Plan
 
 - [x] Implement src/backend/processor.py to generate UI JSON files.

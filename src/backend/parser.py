@@ -350,7 +350,7 @@ def assign_transaction_ids(
             "currency": str(raw.get("currency", "01")),
             "amount": round(float(raw.get("amount", 0)), 2),
             "balance": round(float(raw.get("balance", 0)), 2),
-            "category": str(raw.get("category", "其他")),
+            "category": str(raw.get("category", "Other")),
             "description": str(raw.get("description", "")),
             "raw_text": str(raw.get("raw_text", "")),
             "processed_at": processed_at,

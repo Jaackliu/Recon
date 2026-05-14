@@ -30,9 +30,9 @@
 *   **交易列表显示字段**：
     *   **描述**：交易描述信息。
     *   **日期**：交易日期。
-    *   **账户别名**：来自 `accounts.json` 的 `alias` 字段。
-    *   **交易类型**：使用 `.tag` 样式显示（income/expense/refund/transfer）。
-    *   **收支类别**：使用 `.tag.category` 样式显示，与交易类型大小一致。
+    *   **账户别名**：来自 `accounts.json` 的 `alias` 字段，根据当前语言设置显示对应语言版本。
+    *   **交易类型**：使用 `.tag` 样式显示，根据语言设置翻译（收入/支出/撤销报销/内部转账）。
+    *   **收支类别**：使用 `.tag.category` 样式显示，根据语言设置翻译显示（数据中存储英文 key，前端翻译）。
     *   **金额**：带正负号的交易金额。
     *   **余额**：该笔交易后的帐户余额。
     *   **Hover Tooltip**：鼠标悬停于任意交易行时，行高亮并在光标旁弹出浮窗，展示 `transactions.json` 中该笔交易的全部字段（含 `transaction_id`、`account_code`、`type_code`、`currency`、`raw_text`、`processed_at`、`source_hash` 等）。
@@ -78,9 +78,11 @@
 *   **设置弹窗内容**：
     *   **主题选择 (Appearance)**：提供三个选项 - “System”（跟随系统）、”Light”（浅色模式）、”Dark”（深色模式）。
     *   **默认货币选择 (Default Currency)**：显示所有可用货币选项，使用 `data/config/currency.json` 的 `currency_symbol` 和 `alias` 展示。
+    *   **语言选择 (Language)**：提供三个选项 - “中文”、”English”、”Français”。切换后所有 UI 文本、账户/货币别名、交易类别名称即时翻译。翻译数据来自 `src/frontend/multi-lang.json`。
 *   **数据持久化**：
     *   主题设置保存到 `localStorage` 的 `theme` 键。
     *   默认货币设置保存到 `localStorage` 的 `defaultCurrency` 键。
+    *   语言设置保存到 `localStorage` 的 `language` 键，默认为 `”zh”`。
 *   **默认币种语义**：设置的默认货币将用于”总资产 + 默认”视图的货币视角。前端加载 `fx_rate.json` 并读取 UI JSON 中的 `_meta.processor_default_currency`，当用户选择的默认货币与处理器默认货币不同时，自动对 `”default”` 数据集进行运行时汇率转换。
 
 ---

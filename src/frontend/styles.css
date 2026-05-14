@@ -92,7 +92,7 @@
 }
 
 body {
-  font-family: "Plus Jakarta Sans", sans-serif;
+  font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   color: var(--ink);
   background: radial-gradient(1200px circle at 10% -10%, var(--brand-gradient-1) 0%, var(--brand-gradient-2) 40%),
     radial-gradient(900px circle at 90% 5%, var(--brand-gradient-3) 0%, var(--brand-gradient-4) 55%);
@@ -125,20 +125,13 @@ input {
   border-bottom: 1px solid var(--hairline);
   padding-bottom: var(--space-base);
   margin-bottom: var(--space-lg);
+  position: relative;
 }
 
 .brand {
   display: flex;
   align-items: center;
   gap: var(--space-base);
-}
-
-.brand-mark {
-  width: 44px;
-  height: 44px;
-  border-radius: 16px;
-  background: radial-gradient(circle at 30% 30%, #ff8b9f 0%, var(--rausch) 60%);
-  box-shadow: var(--shadow);
 }
 
 .brand-title {
@@ -157,6 +150,9 @@ input {
   border-radius: var(--radius-full);
   padding: 4px;
   gap: 6px;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .tab {
@@ -429,6 +425,51 @@ input {
 
 .currency-name {
   color: var(--body);
+}
+
+.language-selector {
+  display: flex;
+  gap: 8px;
+}
+
+.language-option {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--canvas);
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--body);
+  transition: all 0.2s ease;
+}
+
+.language-option:hover {
+  border-color: var(--rausch);
+}
+
+.language-option.is-active {
+  border-color: var(--rausch);
+  background: var(--delta-positive-bg);
+}
+
+.lang-icon {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.language-option.is-active .lang-icon {
+  color: var(--rausch);
 }
 
 .settings-row {

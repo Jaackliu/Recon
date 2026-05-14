@@ -191,8 +191,8 @@ def detect_transfers(
                         "currency": currency or "01",
                         "amount": fee,
                         "balance": 0,
-                        "category": "其他",
-                        "description": "转账手续费",
+                        "category": "Other",
+                        "description": "Transfer fee",
                         "raw_text": f"transfer fee for {exp['transaction_id']}",
                     })
                     logger.info("Fee transaction generated: %.2f for %s currency=%s", fee, exp_account, currency)

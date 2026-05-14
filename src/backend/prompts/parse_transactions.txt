@@ -18,7 +18,7 @@ Each element must be an object with these exact fields:
     "currency": "01",
     "amount": 123.45,
     "balance": 67890.00,
-    "category": "餐饮",
+    "category": "Food",
     "description": "short description of the transaction",
     "raw_text": "original text line from the statement"
   }}
@@ -56,8 +56,8 @@ Each element must be an object with these exact fields:
 ### category
 Assign exactly one category from the allowed lists below. Choose the best match based on the transaction description.
 
-Expense categories: 交通, 餐饮, 生活, 购物, 居住, 文娱旅游, 订阅, 通讯, 行政, 外部转账, 其他
-Income categories: 外部转账, 工资, 奖学金, 补助, 税息, 其他
+Expense categories: Transportation, Food, Living, Shopping, Housing, Entertainment, Subscription, Telecom, Administrative, External Transfer, Other
+Income categories: External Transfer, Salary, Scholarship, Subsidy, Tax & Interest, Other
 
 ### description
 A concise summary of the transaction: merchant name, counterparty, or purpose.

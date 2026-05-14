@@ -5,13 +5,15 @@ const DATA_PATHS = {
   staticCharts: "../../data/ui/ui_static_charts.json",
   transactions: "../../data/ui/ui_transactions_and_categories.json",
   currencyBreakdown: "../../data/ui/ui_currency_breakdown.json",
-  fxRates: "../../data/database/fx_rate.json"
+  fxRates: "../../data/database/fx_rate.json",
+  multiLang: "multi-lang.json"
 };
 
 const state = {
   view: "dashboard",
   account: null,
   currency: "default",
+  language: localStorage.getItem("language") || "zh",
   theme: localStorage.getItem("theme") || "system",
   rangeMode: "90",
   customRange: {
@@ -46,7 +48,8 @@ const state = {
     staticCharts: {},
     transactions: {},
     currencyBreakdown: {},
-    fxRates: {}
+    fxRates: {},
+    translations: {}
   },
   charts: {}
 };
@@ -98,6 +101,68 @@ const dom = {
 };
 
 const palette = ["#ff385c", "#ff8b5a", "#f5c542", "#33b28a", "#2f80ed", "#222222", "#ff9aa7"];
+
+/* ---- multi-lang helpers ---- */
+
+function t(key) {
+  const lang = state.language;
+  const dict = state.data.translations[lang];
+  if (dict && dict[key] !== undefined) return dict[key];
+  const fallback = state.data.translations.en;
+  if (fallback && fallback[key] !== undefined) return fallback[key];
+  return key;
+}
+
+function getAlias(multilangObj) {
+  if (!multilangObj) return "";
+  if (typeof multilangObj === "string") return multilangObj;
+  const lang = state.language;
+  return multilangObj[lang] || multilangObj.en || multilangObj.zh || Object.values(multilangObj)[0] || "";
+}
+
+function translateCategory(englishKey) {
+  return t("cat." + englishKey) || englishKey;
+}
+
+function untranslateCategory(displayName) {
+  const catKeys = [
+    "Transportation", "Food", "Living", "Shopping", "Housing", "Entertainment",
+    "Subscription", "Telecom", "Administrative", "External Transfer", "Other",
+    "Salary", "Scholarship", "Subsidy", "Tax & Interest", "Education"
+  ];
+  for (const key of catKeys) {
+    if (t("cat." + key) === displayName) return key;
+  }
+  return displayName;
+}
+
+function getDirectionLabel(direction) {
+  return t("direction." + direction) || "";
+}
+
+function applyLanguage() {
+  document.querySelectorAll("[data-multi-lang]").forEach((el) => {
+    const key = el.getAttribute("data-multi-lang");
+    const translated = t(key);
+    if (el.tagName === "OPTION") {
+      el.textContent = translated;
+    } else {
+      el.textContent = translated;
+    }
+  });
+  document.documentElement.setAttribute("lang", state.language);
+  if (state.data.accounts.length) {
+    buildAccountList();
+    updateCurrencyOptions();
+    updateAll();
+  }
+}
+
+function setActiveLanguageOption() {
+  document.querySelectorAll(".language-option").forEach((option) => {
+    option.classList.toggle("is-active", option.dataset.lang === state.language);
+  });
+}
 
 function getChartTheme() {
   const s = getComputedStyle(document.documentElement);
@@ -165,7 +230,7 @@ function buildCurrencySelector() {
     const button = document.createElement("button");
     button.className = "currency-option";
     button.dataset.currency = currency.currency_code;
-    button.innerHTML = `<span class="currency-symbol">${escapeHtml(currency.currency_symbol)}</span><span class="currency-name">${escapeHtml(currency.alias)}</span>`;
+    button.innerHTML = `<span class="currency-symbol">${escapeHtml(currency.currency_symbol)}</span><span class="currency-name">${escapeHtml(getAlias(currency.alias))}</span>`;
     button.addEventListener("click", () => {
       selectDefaultCurrency(currency.currency_code);
     });
@@ -186,7 +251,7 @@ function selectDefaultCurrency(currencyCode) {
 
   updateCurrencyOptions();
   updateAll();
-  showToast("Default currency updated");
+  showToast(t("toast.currencyUpdated"));
 }
 
 document.addEventListener("click", (event) => {
@@ -199,19 +264,30 @@ document.addEventListener("click", (event) => {
     setActiveThemeOption();
     reinitCharts();
   }
+  const langOption = event.target.closest(".language-option");
+  if (langOption) {
+    const lang = langOption.dataset.lang;
+    state.language = lang;
+    localStorage.setItem("language", lang);
+    setActiveLanguageOption();
+    applyLanguage();
+    reinitCharts();
+    showToast(t("toast.languageUpdated"));
+  }
 });
 
 async function init() {
   try {
     applyTheme(state.theme);
-    const [accounts, currencies, dailySeries, staticCharts, transactions, currencyBreakdown, fxRates] = await Promise.all([
+    const [accounts, currencies, dailySeries, staticCharts, transactions, currencyBreakdown, fxRates, multiLang] = await Promise.all([
       fetchJson(DATA_PATHS.accounts),
       fetchJson(DATA_PATHS.currencies),
       fetchJson(DATA_PATHS.dailySeries),
       fetchJson(DATA_PATHS.staticCharts),
       fetchJson(DATA_PATHS.transactions),
       fetchJson(DATA_PATHS.currencyBreakdown).catch(() => ({})),
-      fetchJson(DATA_PATHS.fxRates).catch(() => ({ rates: {} }))
+      fetchJson(DATA_PATHS.fxRates).catch(() => ({ rates: {} })),
+      fetchJson(DATA_PATHS.multiLang).catch(() => ({}))
     ]);
 
     state.data.accounts = accounts;
@@ -221,16 +297,18 @@ async function init() {
     state.data.transactions = transactions;
     state.data.currencyBreakdown = currencyBreakdown;
     state.data.fxRates = fxRates.rates || {};
+    state.data.translations = multiLang;
 
     buildAccountList();
     bindEvents();
     initCharts();
     setInitialSelections();
+    applyLanguage();
     updateAll();
     revealCards();
     createTxTooltip();
   } catch (error) {
-    showToast("Failed to load data. Use a local server.");
+    showToast(t("toast.failedToLoad"));
     console.error(error);
   }
 }
@@ -245,10 +323,10 @@ function fetchJson(path) {
 }
 
 function buildAccountList() {
-  const list = [{ code: "total", label: "Total Asset" }];
+  const list = [{ code: "total", label: t("status.totalAsset") }];
 
   state.data.accounts.forEach((account) => {
-    list.push({ code: account.account_code, label: account.alias || account.account_name });
+    list.push({ code: account.account_code, label: getAlias(account.alias) || account.account_name });
   });
 
   dom.accountList.innerHTML = "";
@@ -305,7 +383,7 @@ function bindEvents() {
     const start = dom.rangeStart.value;
     const end = dom.rangeEnd.value;
     if (!start || !end || start > end) {
-      showToast("Select a valid date range.");
+      showToast(t("toast.invalidDateRange"));
       return;
     }
     setCustomRange(start, end);
@@ -419,6 +497,7 @@ function setInitialSelections() {
   setActiveRangeButton();
   setActiveCategoryToggle();
   setActiveThemeOption();
+  setActiveLanguageOption();
 }
 
 function setView(view) {
@@ -456,10 +535,10 @@ function updateCurrencyOptions() {
   if (!dom.currencyList) return;
   const available = getAvailableCurrencies(state.account);
   const options = [
-    { value: "default", label: "Default" },
+    { value: "default", label: t("currency.default") },
     ...available.map((code) => {
       const currency = getCurrencyByCode(code);
-      return { value: code, label: currency ? currency.alias : code };
+      return { value: code, label: currency ? getAlias(currency.alias) : code };
     })
   ];
 
@@ -495,13 +574,13 @@ function updateAll() {
 function updateRangeSummary() {
   const series = getSeriesForAccount(state.account);
   if (!series || series.length === 0) {
-    dom.rangeInfo.textContent = "No data";
+    dom.rangeInfo.textContent = t("status.noData");
     return;
   }
   const range = getRange(series);
-  dom.rangeInfo.textContent = `${range.startDate} to ${range.endDate}`;
+  dom.rangeInfo.textContent = `${range.startDate} — ${range.endDate}`;
   dom.rangeSummary.textContent = `${range.startDate} - ${range.endDate}`;
-  dom.lastUpdated.textContent = `Data up to ${range.endDate}`;
+  dom.lastUpdated.textContent = `${t("status.dataUpTo")} ${range.endDate}`;
 }
 
 function updateDashboard() {
@@ -532,10 +611,10 @@ function updateBalanceOverview(series, slice, range) {
   const accountLabel = getAccountLabel(state.account);
   dom.balanceTitle.textContent = accountLabel;
   dom.balanceValue.textContent = formatMoney(lastEntry.end_balance);
-  dom.balanceMeta.textContent = `End balance on ${range.endDate}`;
+  dom.balanceMeta.textContent = `${t("balance.endBalanceOn")} ${range.endDate}`;
 
   const delta = getDelta(series, range);
-  if (delta.label === "Change hidden") {
+  if (delta.label === t("balance.changeHidden")) {
     dom.balanceDelta.style.display = "none";
   } else {
     dom.balanceDelta.style.display = "";
@@ -556,7 +635,7 @@ function updateBalanceOverview(series, slice, range) {
       if (!balanceAtDate) return;
       const row = document.createElement("div");
       row.className = "account-row";
-      row.innerHTML = `<span>${escapeHtml(account.alias || account.account_name)}</span><strong>${formatMoney(balanceAtDate.end_balance)}</strong>`;
+      row.innerHTML = `<span>${escapeHtml(getAlias(account.alias) || account.account_name)}</span><strong>${formatMoney(balanceAtDate.end_balance)}</strong>`;
       dom.accountBreakdown.appendChild(row);
     });
   } else if (state.currency === "default") {
@@ -564,7 +643,7 @@ function updateBalanceOverview(series, slice, range) {
     if (breakdown && breakdown.length > 0) {
       breakdown.forEach((item) => {
         const currency = getCurrencyByCode(item.currency);
-        const name = currency ? currency.alias : item.currency;
+        const name = currency ? getAlias(currency.alias) : item.currency;
         const row = document.createElement("div");
         row.className = "account-row";
         row.innerHTML = `<span>${escapeHtml(name)}</span><strong>${formatMoney(item.end_balance)}</strong>`;
@@ -652,7 +731,7 @@ function updateHeatmap() {
         color: theme.muted,
         fontSize: 10,
         margin: 4,
-        nameMap: "en",
+        nameMap: state.language,
         position: "start"
       },
       dayLabel: { show: false }
@@ -719,7 +798,7 @@ function updateMonthlyChart() {
     ],
     series: [
       {
-        name: "Inflow",
+        name: t("chart.inflow"),
         type: "bar",
         data: inflow,
         yAxisIndex: 1,
@@ -728,7 +807,7 @@ function updateMonthlyChart() {
         barWidth: 4
       },
       {
-        name: "Outflow",
+        name: t("chart.outflow"),
         type: "bar",
         data: outflow,
         yAxisIndex: 1,
@@ -737,7 +816,7 @@ function updateMonthlyChart() {
         barWidth: 4
       },
       {
-        name: "Balance",
+        name: t("chart.balance"),
         type: "line",
         data: balances,
         smooth: true,
@@ -805,7 +884,7 @@ function updateDailyChart(slice) {
     ],
     series: [
       {
-        name: "Inflow",
+        name: t("chart.inflow"),
         type: "bar",
         data: inflow,
         yAxisIndex: 1,
@@ -814,7 +893,7 @@ function updateDailyChart(slice) {
         barMaxWidth: 6
       },
       {
-        name: "Outflow",
+        name: t("chart.outflow"),
         type: "bar",
         data: outflow,
         yAxisIndex: 1,
@@ -823,7 +902,7 @@ function updateDailyChart(slice) {
         barMaxWidth: 18
       },
       {
-        name: "Balance",
+        name: t("chart.balance"),
         type: "line",
         data: balances,
         smooth: true,
@@ -856,38 +935,45 @@ function updateSankey() {
   const sumExpense = sumValues(expense);
   const flowThrough = round2(Math.min(sumIncome, sumExpense));
 
+  const incomePrefix = t("sankey.incomePrefix");
+  const expensePrefix = t("sankey.expensePrefix");
+  const totalIncome = t("sankey.totalIncome");
+  const totalExpense = t("sankey.totalExpense");
+  const useBalance = t("sankey.useBalance");
+  const retained = t("sankey.retained");
+
   const data = [];
   const links = [];
 
   // Level 0: income categories
   Object.keys(income).forEach((category) => {
-    const name = `收入: ${category}`;
+    const name = `${incomePrefix}${translateCategory(category)}`;
     data.push({ name, depth: 0 });
-    links.push({ source: name, target: "Total Income", value: income[category] });
+    links.push({ source: name, target: totalIncome, value: income[category] });
   });
 
   // Level 1: Total Income + Use Balance
-  data.push({ name: "Total Income", depth: 1 });
+  data.push({ name: totalIncome, depth: 1 });
   if (sumExpense > sumIncome) {
-    data.push({ name: "Use Balance", depth: 1 });
-    links.push({ source: "Use Balance", target: "Total Expense", value: round2(sumExpense - sumIncome) });
+    data.push({ name: useBalance, depth: 1 });
+    links.push({ source: useBalance, target: totalExpense, value: round2(sumExpense - sumIncome) });
   }
   if (flowThrough > 0) {
-    links.push({ source: "Total Income", target: "Total Expense", value: flowThrough });
+    links.push({ source: totalIncome, target: totalExpense, value: flowThrough });
   }
 
   // Level 2: Total Expense + Retained
-  data.push({ name: "Total Expense", depth: 2 });
+  data.push({ name: totalExpense, depth: 2 });
   if (sumIncome > sumExpense) {
-    data.push({ name: "Retained", depth: 2 });
-    links.push({ source: "Total Income", target: "Retained", value: round2(sumIncome - sumExpense) });
+    data.push({ name: retained, depth: 2 });
+    links.push({ source: totalIncome, target: retained, value: round2(sumIncome - sumExpense) });
   }
 
   // Level 3: expense categories
   Object.keys(expense).forEach((category) => {
-    const name = `支出: ${category}`;
+    const name = `${expensePrefix}${translateCategory(category)}`;
     data.push({ name, depth: 3 });
-    links.push({ source: "Total Expense", target: name, value: expense[category] });
+    links.push({ source: totalExpense, target: name, value: expense[category] });
   });
 
   const option = {
@@ -931,7 +1017,7 @@ function updateCategoryPanel() {
 
   const totals = groupByCategory(filtered);
   const donutData = Object.entries(totals).map(([name, value], index) => ({
-    name,
+    name: translateCategory(name),
     value,
     itemStyle: { color: palette[index % palette.length] }
   }));
@@ -974,7 +1060,7 @@ function updateTransactionsView() {
 
   dom.transactionsList.innerHTML = "";
   if (filtered.length === 0) {
-    dom.transactionsList.innerHTML = `<div class="card">No transactions in range.</div>`;
+    dom.transactionsList.innerHTML = `<div class="card">${t("transactions.noTransactionsInRange")}</div>`;
     return;
   }
 
@@ -987,9 +1073,9 @@ function updateTransactionsView() {
         <strong>${escapeHtml(item.description)}</strong>
         <div class="meta">${escapeHtml(item.date)}</div>
       </div>
-      <div class="meta">${escapeHtml(item.alias)}</div>
+      <div class="meta">${escapeHtml(getAlias(item.alias))}</div>
       <div><span class="tag ${item.type}">${formatType(item.type)}</span></div>
-      <div><span class="tag category">${escapeHtml(item.category)}</span></div>
+      <div><span class="tag category">${escapeHtml(translateCategory(item.category))}</span></div>
       <div class="transaction-amount">${formatSignedMoney(item.amount, item.cashflow_direction)}</div>
       <div class="transaction-balance">${formatMoney(item.balance)}</div>
     `;
@@ -1036,11 +1122,17 @@ function bindChartInteractions() {
   state.charts.sankey.on("click", (params) => {
     if (!params || params.dataType !== "node") return;
     const name = params.name || "";
-    if (name.startsWith("收入: ")) {
-      openCategoryDetail(name.replace("收入: ", ""), "income");
+    const incomePrefix = t("sankey.incomePrefix");
+    const expensePrefix = t("sankey.expensePrefix");
+    if (name.startsWith(incomePrefix)) {
+      const displayCat = name.slice(incomePrefix.length);
+      const englishCat = untranslateCategory(displayCat);
+      openCategoryDetail(englishCat, "income");
     }
-    if (name.startsWith("支出: ")) {
-      openCategoryDetail(name.replace("支出: ", ""), "expense");
+    if (name.startsWith(expensePrefix)) {
+      const displayCat = name.slice(expensePrefix.length);
+      const englishCat = untranslateCategory(displayCat);
+      openCategoryDetail(englishCat, "expense");
     }
   });
 
@@ -1079,14 +1171,14 @@ function openDayDetail(date) {
   state.detail.categoryType = "";
 
   const netflow = round2(entry.all_inflow + entry.all_outflow);
-  dom.detailTitle.textContent = "Daily details";
+  dom.detailTitle.textContent = t("detail.dailyDetails");
   dom.detailSubtitle.textContent = `${date} · ${getAccountLabel(state.account)}`;
   renderDetailMetrics([
-    { label: "Date", value: date },
-    { label: "End balance", value: formatMoney(entry.end_balance) },
-    { label: "Netflow", value: formatMoney(netflow) },
-    { label: "Inflow", value: formatMoney(entry.all_inflow) },
-    { label: "Outflow", value: formatMoney(entry.all_outflow) }
+    { label: t("detail.date"), value: date },
+    { label: t("detail.endBalance"), value: formatMoney(entry.end_balance) },
+    { label: t("detail.netflow"), value: formatMoney(netflow) },
+    { label: t("detail.inflow"), value: formatMoney(entry.all_inflow) },
+    { label: t("detail.outflow"), value: formatMoney(entry.all_outflow) }
   ]);
   dom.detailFilters.style.display = "flex";
   syncDetailFilters();
@@ -1109,13 +1201,13 @@ function openCategoryDetail(category, categoryType) {
   const total = sumBy(transactions, "amount");
   const typeLabel = formatType(categoryType);
 
-  dom.detailTitle.textContent = `${typeLabel} category`;
-  dom.detailSubtitle.textContent = `${category} · ${range.startDate} to ${range.endDate}`;
+  dom.detailTitle.textContent = `${typeLabel} ${t("detail.categorySuffix")}`;
+  dom.detailSubtitle.textContent = `${translateCategory(category)} · ${range.startDate} — ${range.endDate}`;
   renderDetailMetrics([
-    { label: "Category", value: category },
-    { label: "Range", value: `${range.startDate} to ${range.endDate}` },
-    { label: "Transactions", value: String(transactions.length) },
-    { label: "Total amount", value: formatMoney(total) }
+    { label: t("detail.category"), value: translateCategory(category) },
+    { label: t("detail.range"), value: `${range.startDate} — ${range.endDate}` },
+    { label: t("detail.transactions"), value: String(transactions.length) },
+    { label: t("detail.totalAmount"), value: formatMoney(total) }
   ]);
   dom.detailFilters.style.display = "flex";
   syncDetailFilters();
@@ -1139,7 +1231,7 @@ function renderDetailList() {
   dom.detailList.innerHTML = "";
 
   if (transactions.length === 0) {
-    dom.detailList.innerHTML = `<div class="detail-empty">No transactions found.</div>`;
+    dom.detailList.innerHTML = `<div class="detail-empty">${t("transactions.noTransactions")}</div>`;
     return;
   }
 
@@ -1149,10 +1241,10 @@ function renderDetailList() {
     row._txData = item;
     row.innerHTML = `
       <div><strong>${escapeHtml(item.description)}</strong><div class="meta">${escapeHtml(item.date)}</div></div>
-      <div><span class="tag category">${escapeHtml(item.category)}</span></div>
+      <div><span class="tag category">${escapeHtml(translateCategory(item.category))}</span></div>
       <div><span class="tag ${item.type}">${formatType(item.type)}</span></div>
       <div class="detail-amount">${formatSignedMoney(item.amount, item.cashflow_direction)}</div>
-      <div class="detail-account">${escapeHtml(item.alias)}</div>
+      <div class="detail-account">${escapeHtml(getAlias(item.alias))}</div>
       <div class="detail-balance">${formatMoney(item.balance)}</div>
     `;
     dom.detailList.appendChild(row);
@@ -1391,19 +1483,19 @@ function getDelta(series, range) {
   const daysMap = { "7": 7, "30": 30, "90": 90, "180": 180, "365": 365 };
   const days = daysMap[state.rangeMode];
   if (!days) {
-    return { label: "Change hidden", status: "neutral" };
+    return { label: t("balance.changeHidden"), status: "neutral" };
   }
 
   const endIndex = series.findIndex((entry) => entry.date === range.endDate);
   const prevIndex = endIndex - days;
   if (endIndex < 0 || prevIndex < 0) {
-    return { label: "Change hidden", status: "neutral" };
+    return { label: t("balance.changeHidden"), status: "neutral" };
   }
 
   const current = series[endIndex].end_balance;
   const prev = series[prevIndex].end_balance;
   if (prev === 0) {
-    return { label: "Change hidden", status: "neutral" };
+    return { label: t("balance.changeHidden"), status: "neutral" };
   }
 
   const change = ((current - prev) / prev) * 100;
@@ -1412,9 +1504,9 @@ function getDelta(series, range) {
 }
 
 function getAccountLabel(code) {
-  if (code === "total") return "Total Asset";
+  if (code === "total") return t("status.totalAsset");
   const account = state.data.accounts.find((item) => item.account_code === code);
-  return account ? account.alias || account.account_name : code;
+  return account ? getAlias(account.alias) || account.account_name : code;
 }
 
 function getAvailableCurrencies(accountCode) {
@@ -1503,7 +1595,7 @@ function formatRatio(value, base, sign) {
 }
 
 function formatType(type) {
-  return type.charAt(0).toUpperCase() + type.slice(1);
+  return t("type." + type) || type;
 }
 
 function formatK(value) {
@@ -1528,7 +1620,7 @@ function renderDonutLegend(data) {
 }
 
 function showEmptyDashboard() {
-  dom.balanceTitle.textContent = "No data";
+  dom.balanceTitle.textContent = t("status.noData");
   dom.balanceValue.textContent = "--";
   dom.balanceMeta.textContent = "";
   dom.balanceDelta.textContent = "";
@@ -1584,8 +1676,6 @@ function escapeHtml(text) {
 
 /* ---- Transaction Tooltip ---- */
 
-const DIRECTION_LABELS = { 1: "流入", 2: "流出" };
-
 function createTxTooltip() {
   const el = document.createElement("div");
   el.id = "txTooltip";
@@ -1614,22 +1704,22 @@ function showTxTooltip(tx, event) {
   const el = document.getElementById("txTooltip");
   if (!el) return;
   const currency = getCurrencyByCode(tx.currency);
-  const currencyLabel = currency ? `${currency.alias} (${currency.currency_symbol})` : tx.currency;
+  const currencyLabel = currency ? `${getAlias(currency.alias)} (${currency.currency_symbol})` : tx.currency;
   const rows = [
-    ["Transaction ID", tx.id],
-    ["Date", tx.date],
-    ["Account Code", tx.account_code],
-    ["Account Alias", tx.alias],
-    ["Type Code", `${tx.type_code} (${formatType(tx.type)})`],
-    ["Cashflow Direction", `${tx.cashflow_direction} (${DIRECTION_LABELS[tx.cashflow_direction] || "-"})`],
-    ["Currency", currencyLabel],
-    ["Amount", formatMoney(tx.amount, tx.currency)],
-    ["Balance", formatMoney(tx.balance, tx.currency)],
-    ["Category", tx.category],
-    ["Description", tx.description],
-    ["Raw Text", tx.raw_text || "-"],
-    ["Processed At", tx.processed_at || "-"],
-    ["File Name", tx.file_name || "-"],
+    [t("tooltip.transactionId"), tx.id],
+    [t("tooltip.date"), tx.date],
+    [t("tooltip.accountCode"), tx.account_code],
+    [t("tooltip.accountAlias"), getAlias(tx.alias)],
+    [t("tooltip.typeCode"), `${tx.type_code} (${formatType(tx.type)})`],
+    [t("tooltip.cashflowDirection"), `${tx.cashflow_direction} (${getDirectionLabel(tx.cashflow_direction)})`],
+    [t("tooltip.currency"), currencyLabel],
+    [t("tooltip.amount"), formatMoney(tx.amount, tx.currency)],
+    [t("tooltip.balance"), formatMoney(tx.balance, tx.currency)],
+    [t("tooltip.category"), translateCategory(tx.category)],
+    [t("tooltip.description"), tx.description],
+    [t("tooltip.rawText"), tx.raw_text || "-"],
+    [t("tooltip.processedAt"), tx.processed_at || "-"],
+    [t("tooltip.fileName"), tx.file_name || "-"],
   ];
   el.innerHTML = rows.map(([k, v]) => `<div class="tt-row"><span class="tt-key">${escapeHtml(k)}</span><span class="tt-val">${escapeHtml(String(v))}</span></div>`).join("");
   el.style.display = "block";

@@ -17,7 +17,7 @@
 | :--- | :--- | :--- | :--- |
 | **货币代码** | `currency_code` | String | **主键**。两位数字字符串（例："01"），全系统唯一。 |
 | **ISO 货币代码** | `currency_iso` | String | ISO 4217 三位大写字母（例："CNY"），用于汇率获取与跨系统对接。 |
-| **货币别名** | `alias` | String | 用于前端展示（例："人民币"、"美元"、"港币"）。 |
+| **货币别名** | `alias` | Object | 用于前端展示的多语言对象，包含 `zh`、`en`、`fr` 三个键（例：`{"zh": "人民币", "en": "Chinese Yuan", "fr": "Yuan chinois"}`）。 |
 | **货币符号** | `currency_symbol` | String | 用于前端显示（例："￥"、"$"、"HK$"）。 |
 
 ### 1.1 `fx_rate.json` (汇率矩阵)
@@ -50,7 +50,7 @@
 | 字段名 | 键名 (Key) | 数据类型 | 说明 / 约束 |
 | :--- | :--- | :--- | :--- |
 | **银行账户代码** | `account_code` | String | **主键**。手动规定的三位数字符串（例："001"），全系统唯一。 |
-| **备注名** | `alias` | String | 仅用于前端展示的易读名称（例："招行主卡"），不传入 AI API。 |
+| **备注名** | `alias` | Object | 仅用于前端展示的多语言易读名称，包含 `zh`、`en`、`fr` 三个键（例：`{"zh": "建行龙卡通", "en": "CCB Dragon Card", "fr": "Carte Dragon CCB"}`），不传入 AI API。 |
 | **账户名称** | `account_name` | String | 账户正式名称（例："招商银行借记卡"）。 |
 | **发行银行** | `bank_name` | String | 发卡行名称（例："招商银行"）。 |
 | **账号** | `account_number` | String | 银行卡号或统一账号。 |
@@ -80,9 +80,9 @@
 | **源文件哈希** | `source_hash` | String | Python | 来源 PDF 文件的 SHA-256 哈希值。 |
 
 #### 2.1 收支类别 (Category) 枚举限定
-AI API 分类时只能输出以下确切的字符串之一：
-*   **支出类别枚举**：`交通`, `餐饮`, `生活`, `购物`, `居住`, `文娱旅游`, `订阅`, `通讯`, `行政`, `外部转账`, `其他`
-*   **收入类别枚举**：`外部转账`, `工资`, `奖学金`, `补助`, `税息`, `其他`
+AI API 分类时只能输出以下确切的英文字符串之一（前端会根据语言设置翻译显示）：
+*   **支出类别枚举**：`Transportation`, `Food`, `Living`, `Shopping`, `Housing`, `Entertainment`, `Subscription`, `Telecom`, `Administrative`, `External Transfer`, `Other`
+*   **收入类别枚举**：`External Transfer`, `Salary`, `Scholarship`, `Subsidy`, `Tax & Interest`, `Other`
 
 ### 4. `parsed.json` (解析历史记录)
 用于记录已经处理过的银行账单 PDF，防止重复调用 AI API。所有字段均由 Python 维护。
