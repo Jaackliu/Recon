@@ -31,7 +31,7 @@ const state = {
     date: "",
     category: "",
     categoryType: "",
-    sort: "id",
+    sort: "date",
     filters: {
       income: true,
       expense: true,
@@ -228,6 +228,7 @@ async function init() {
     setInitialSelections();
     updateAll();
     revealCards();
+    createTxTooltip();
   } catch (error) {
     showToast("Failed to load data. Use a local server.");
     console.error(error);
@@ -396,6 +397,9 @@ function bindEvents() {
       closeSettingsModal();
     }
   });
+
+  bindTxTooltipEvents(dom.transactionsList);
+  bindTxTooltipEvents(dom.detailList);
 
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
     if (state.theme === "system") {
@@ -977,14 +981,17 @@ function updateTransactionsView() {
   filtered.forEach((item) => {
     const row = document.createElement("div");
     row.className = "transaction-row";
+    row._txData = item;
     row.innerHTML = `
       <div>
         <strong>${escapeHtml(item.description)}</strong>
-        <div class="meta">${escapeHtml(item.category)} - ${escapeHtml(item.date)}</div>
+        <div class="meta">${escapeHtml(item.date)}</div>
       </div>
-      <div class="meta">${escapeHtml(item.id)}</div>
+      <div class="meta">${escapeHtml(item.alias)}</div>
       <div><span class="tag ${item.type}">${formatType(item.type)}</span></div>
+      <div><span class="tag category">${escapeHtml(item.category)}</span></div>
       <div class="transaction-amount">${formatSignedMoney(item.amount, item.cashflow_direction)}</div>
+      <div class="transaction-balance">${formatMoney(item.balance)}</div>
     `;
     dom.transactionsList.appendChild(row);
   });
@@ -1139,12 +1146,14 @@ function renderDetailList() {
   transactions.forEach((item) => {
     const row = document.createElement("div");
     row.className = "detail-row";
+    row._txData = item;
     row.innerHTML = `
-      <div><strong>${escapeHtml(item.description)}</strong></div>
-      <div>${escapeHtml(item.category)}</div>
+      <div><strong>${escapeHtml(item.description)}</strong><div class="meta">${escapeHtml(item.date)}</div></div>
+      <div><span class="tag category">${escapeHtml(item.category)}</span></div>
       <div><span class="tag ${item.type}">${formatType(item.type)}</span></div>
       <div class="detail-amount">${formatSignedMoney(item.amount, item.cashflow_direction)}</div>
-      <div class="detail-id">${escapeHtml(item.id)}</div>
+      <div class="detail-account">${escapeHtml(item.alias)}</div>
+      <div class="detail-balance">${formatMoney(item.balance)}</div>
     `;
     dom.detailList.appendChild(row);
   });
@@ -1170,7 +1179,7 @@ function getDetailTransactions() {
   if (state.detail.sort === "amount") {
     filtered.sort((a, b) => b.amount - a.amount);
   } else {
-    filtered.sort((a, b) => a.id.localeCompare(b.id));
+    filtered.sort((a, b) => (a.date < b.date ? 1 : -1));
   }
 
   return filtered;
@@ -1308,7 +1317,8 @@ const AMOUNT_KEYS = new Set([
   "start_balance", "end_balance",
   "all_inflow", "all_outflow", "net_internal_transfer",
   "filtered_inflow", "filtered_outflow",
-  "amount", "inflow", "outflow", "net_inflow"
+  "amount", "inflow", "outflow", "net_inflow",
+  "balance"
 ]);
 
 function convertValue(value, rate) {
@@ -1570,4 +1580,83 @@ function escapeHtml(text) {
     "'": "&#039;"
   };
   return String(text).replace(/[&<>"']/g, (match) => map[match]);
+}
+
+/* ---- Transaction Tooltip ---- */
+
+const DIRECTION_LABELS = { 1: "流入", 2: "流出" };
+
+function createTxTooltip() {
+  const el = document.createElement("div");
+  el.id = "txTooltip";
+  el.style.display = "none";
+  document.body.appendChild(el);
+}
+
+function bindTxTooltipEvents(container) {
+  if (!container) return;
+  container.addEventListener("mouseover", (event) => {
+    const row = event.target.closest(".transaction-row, .detail-row");
+    if (!row || !row._txData) return;
+    showTxTooltip(row._txData, event);
+  });
+  container.addEventListener("mouseout", (event) => {
+    const row = event.target.closest(".transaction-row, .detail-row");
+    if (!row) return;
+    const related = event.relatedTarget;
+    if (related && row.contains(related)) return;
+    hideTxTooltip();
+  });
+  container.addEventListener("mousemove", moveTxTooltip);
+}
+
+function showTxTooltip(tx, event) {
+  const el = document.getElementById("txTooltip");
+  if (!el) return;
+  const currency = getCurrencyByCode(tx.currency);
+  const currencyLabel = currency ? `${currency.currency_name} (${currency.currency_symbol})` : tx.currency;
+  const rows = [
+    ["Transaction ID", tx.id],
+    ["Date", tx.date],
+    ["Account Code", tx.account_code],
+    ["Account Alias", tx.alias],
+    ["Type Code", `${tx.type_code} (${formatType(tx.type)})`],
+    ["Cashflow Direction", `${tx.cashflow_direction} (${DIRECTION_LABELS[tx.cashflow_direction] || "-"})`],
+    ["Currency", currencyLabel],
+    ["Amount", formatMoney(tx.amount, tx.currency)],
+    ["Balance", formatMoney(tx.balance, tx.currency)],
+    ["Category", tx.category],
+    ["Description", tx.description],
+    ["Raw Text", tx.raw_text || "-"],
+    ["Processed At", tx.processed_at || "-"],
+    ["File Name", tx.file_name || "-"],
+  ];
+  el.innerHTML = rows.map(([k, v]) => `<div class="tt-row"><span class="tt-key">${escapeHtml(k)}</span><span class="tt-val">${escapeHtml(String(v))}</span></div>`).join("");
+  el.style.display = "block";
+  positionTxTooltip(el, event);
+}
+
+function hideTxTooltip() {
+  const el = document.getElementById("txTooltip");
+  if (el) el.style.display = "none";
+}
+
+function moveTxTooltip(event) {
+  const el = document.getElementById("txTooltip");
+  if (!el || el.style.display === "none") return;
+  positionTxTooltip(el, event);
+}
+
+function positionTxTooltip(el, event) {
+  const pad = 12;
+  const w = el.offsetWidth;
+  const h = el.offsetHeight;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  let x = event.clientX + pad;
+  let y = event.clientY - h - pad;
+  if (y < 0) y = event.clientY + pad;
+  if (x + w > vw) x = event.clientX - w - pad;
+  el.style.left = x + "px";
+  el.style.top = y + "px";
 }

@@ -896,14 +896,19 @@ input {
 
 .transaction-row {
   display: grid;
-  grid-template-columns: 1.5fr 1fr 1fr 0.6fr;
+  grid-template-columns: 1.5fr 1fr 0.8fr 0.8fr 0.6fr 0.8fr;
   gap: var(--space-base);
   align-items: center;
+  text-align: center;
   padding: 14px 16px;
   border-radius: var(--radius-md);
   border: 1px solid var(--hairline);
   background: var(--canvas);
   box-shadow: var(--shadow);
+}
+
+.transaction-row > div:first-child {
+  text-align: left;
 }
 
 .transaction-row strong {
@@ -913,11 +918,6 @@ input {
 .transaction-row .meta {
   font-size: 12px;
   color: var(--muted);
-}
-
-.transaction-amount {
-  font-weight: 600;
-  text-align: right;
 }
 
 .tag {
@@ -949,6 +949,22 @@ input {
 .tag.transfer {
   background: var(--tag-transfer-bg);
   color: var(--tag-transfer-fg);
+}
+
+.tag.category {
+  background: var(--surface-soft);
+  color: var(--body);
+  font-weight: 500;
+}
+
+.transaction-amount {
+  font-weight: 600;
+}
+
+.transaction-balance {
+  font-weight: 500;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .modal {
@@ -1076,9 +1092,15 @@ input {
 .detail-header,
 .detail-row {
   display: grid;
-  grid-template-columns: 1.5fr 1fr 0.7fr 0.7fr 1.2fr;
+  grid-template-columns: 1.5fr 0.8fr 0.7fr 0.7fr 1fr 0.8fr;
   gap: var(--space-base);
   align-items: center;
+  text-align: center;
+}
+
+.detail-header > span:first-child,
+.detail-row > div:first-child {
+  text-align: left;
 }
 
 .detail-header {
@@ -1102,15 +1124,25 @@ input {
   font-size: 13px;
 }
 
-.detail-amount {
-  font-weight: 600;
-  text-align: right;
+.detail-row .meta {
+  font-size: 11px;
+  color: var(--muted);
 }
 
-.detail-id {
+.detail-amount {
+  font-weight: 600;
+}
+
+.detail-account {
   font-size: 12px;
   color: var(--muted);
   word-break: break-all;
+}
+
+.detail-balance {
+  font-weight: 500;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .detail-empty {
@@ -1120,6 +1152,45 @@ input {
   font-size: 13px;
   color: var(--muted);
   text-align: center;
+}
+
+.transaction-row:hover,
+.detail-row:hover {
+  background: var(--surface-soft);
+  border-color: var(--rausch);
+}
+
+#txTooltip {
+  position: fixed;
+  z-index: 50;
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  padding: 12px 16px;
+  max-width: 420px;
+  max-height: 60vh;
+  overflow-y: auto;
+  font-size: 12px;
+  line-height: 1.6;
+  pointer-events: none;
+}
+
+#txTooltip .tt-row {
+  display: flex;
+  gap: 8px;
+}
+
+#txTooltip .tt-key {
+  flex-shrink: 0;
+  min-width: 120px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+#txTooltip .tt-val {
+  color: var(--ink);
+  word-break: break-all;
 }
 
 .toast {
@@ -1228,7 +1299,8 @@ input {
     text-align: left;
   }
 
-  .transaction-amount {
+  .transaction-amount,
+  .transaction-balance {
     text-align: left;
   }
 
@@ -1238,7 +1310,14 @@ input {
     text-align: left;
   }
 
-  .detail-amount {
+  .detail-amount,
+  .detail-balance {
+    text-align: left;
+  }
+
+  .transaction-row > div:first-child,
+  .detail-header > span:first-child,
+  .detail-row > div:first-child {
     text-align: left;
   }
 }

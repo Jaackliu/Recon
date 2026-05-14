@@ -183,6 +183,9 @@
 
 专供 **F (桑基图)**、**G (分类占比与排行)** 以及 **Transactions 列表页** 使用。由于分类的图表必须依据自定义时间范围实时重绘，后端需提供一个清洗后、附带所属类别的列表，以便前端极速求和聚合。
 *   **现金流方向**：每条交易必须包含 `cashflow_direction`，供 Transactions 列表页决定金额正负。
+*   **账户别名**：每条交易必须包含 `alias`，来自 `accounts.json` 对应账户的 `alias` 字段。
+*   **帐户余额**：每条交易必须包含 `balance`，为该笔交易后的帐户余额。
+*   **原始字段**：每条交易额外携带 `account_code`、`account_number`、`type_code`、`currency`、`raw_text`、`processed_at`、`source_hash`，供前端 tooltip 展示完整交易信息。
 
 ```json
 {
@@ -197,7 +200,16 @@
           "category": "餐饮",
           "amount": 45.50,
           "cashflow_direction": 2,
-          "description": "麦当劳"
+          "description": "麦当劳",
+          "alias": "建行龙卡通",
+          "balance": 9550.50,
+          "account_code": "001",
+          "account_number": "6217002020093434447",
+          "type_code": 2,
+          "currency": "01",
+          "raw_text": "消费 支付宝-麦当劳",
+          "processed_at": "2026-05-12T23:15:24+08:00",
+          "source_hash": "ff9e1399..."
         }
       ]
     }
@@ -213,7 +225,16 @@
           "category": "餐饮",
           "amount": 45.50,
           "cashflow_direction": 2,
-          "description": "麦当劳"
+          "description": "麦当劳",
+          "alias": "建行龙卡通",
+          "balance": 9550.50,
+          "account_code": "001",
+          "account_number": "6217002020093434447",
+          "type_code": 2,
+          "currency": "01",
+          "raw_text": "消费 支付宝-麦当劳",
+          "processed_at": "2026-05-12T23:15:24+08:00",
+          "source_hash": "ff9e1399..."
         }
       ]
     }
@@ -229,7 +250,16 @@
           "category": "餐饮",
           "amount": 45.50,
           "cashflow_direction": 2,
-          "description": "麦当劳"
+          "description": "麦当劳",
+          "alias": "建行龙卡通",
+          "balance": 9550.50,
+          "account_code": "001",
+          "account_number": "6217002020093434447",
+          "type_code": 2,
+          "currency": "01",
+          "raw_text": "消费 支付宝-麦当劳",
+          "processed_at": "2026-05-12T23:15:24+08:00",
+          "source_hash": "ff9e1399..."
         }
       ]
     }

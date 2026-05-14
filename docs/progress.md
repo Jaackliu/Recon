@@ -80,6 +80,31 @@
 - Updated documentation references in `schema.md`, `process.md`, `frontend.md`.
 - Updated `.claude/settings.local.json` permission allowlists.
 
+## 2026-05-14 (交易显示优化)
+- 前端交易显示优化：
+  - 删除交易ID的显示
+  - 添加账户别名（alias）显示（替代原 account_number）
+  - 添加帐户余额（balance）显示
+  - 收支类别放大到和交易类型一样大小（使用 `.tag.category` 样式）
+  - 所有列居中对齐（第一列描述保持左对齐）
+- 后端 processor.py 修改：
+  - `serialize_transaction` 函数添加 `alias`、`balance`、`account_code`、`account_number`、`type_code`、`currency`、`raw_text`、`processed_at`、`source_hash` 字段
+  - `build_transactions_output` 和 `build_dataset` 函数接收 `accounts_by_code` 参数
+- 前端样式修改：
+  - 更新交易列表和详情列表网格布局为6列
+  - 添加 `.tag.category`、`.transaction-balance`、`.detail-account`、`.detail-balance` 样式
+- 文档更新：
+  - 更新 `docs/process.md` 中的 JSON schema 和示例
+  - 更新 `docs/frontend.md` 中的展示字段和交互说明
+
+## 2026-05-14 (Transaction Hover Tooltip)
+- 前端：所有 transaction 行（交易列表页 + 详情弹窗）hover 高亮，光标旁浮窗显示 `transactions.json` 全部字段
+  - 事件委托绑定在 `#transactionsList` 和 `#detailList` 容器上
+  - 浮窗 `#txTooltip` 跟随鼠标定位，自动避让视口边缘
+- 后端：`serialize_transaction` 追加 `account_code`、`account_number`、`type_code`、`currency`、`raw_text`、`processed_at`、`source_hash`
+- 样式：`.transaction-row:hover` / `.detail-row:hover` 高亮 + `#txTooltip` 浮窗
+- 文档：更新 `process.md` schema、`frontend.md` 各模块交互说明
+
 ## Plan
 
 - [x] Implement src/backend/processor.py to generate UI JSON files.

@@ -474,6 +474,8 @@ def build_monthly_combo(series: List[Dict[str, Any]], months: int = 12) -> List[
 def build_transactions_output(
     account_codes: List[str],
     transactions_by_account: Dict[str, List[Dict[str, Any]]],
+    accounts_by_code: Dict[str, Dict[str, Any]],
+    hash_to_filename: Dict[str, str],
     include_total: bool = True,
 ) -> Dict[str, Dict[str, List[Dict[str, Any]]]]:
     def tx_sort_key(tx: Dict[str, Any]) -> Any:
@@ -484,7 +486,7 @@ def build_transactions_output(
     for account_code in account_codes:
         txs = sorted(transactions_by_account.get(account_code, []), key=tx_sort_key)
         output[account_code] = {
-            "transactions": [serialize_transaction(tx) for tx in txs]
+            "transactions": [serialize_transaction(tx, accounts_by_code, hash_to_filename) for tx in txs]
         }
 
     if include_total:
@@ -493,12 +495,19 @@ def build_transactions_output(
             all_txs.extend(transactions_by_account.get(account_code, []))
         all_txs.sort(key=tx_sort_key)
 
-        output["total"] = {"transactions": [serialize_transaction(tx) for tx in all_txs]}
+        output["total"] = {"transactions": [serialize_transaction(tx, accounts_by_code, hash_to_filename) for tx in all_txs]}
     return output
 
 
-def serialize_transaction(tx: Dict[str, Any]) -> Dict[str, Any]:
+def serialize_transaction(
+    tx: Dict[str, Any],
+    accounts_by_code: Dict[str, Dict[str, Any]],
+    hash_to_filename: Dict[str, str],
+) -> Dict[str, Any]:
     type_code = int(tx["type_code"])
+    account_code = tx.get("account_code", "")
+    account = accounts_by_code.get(account_code, {})
+    source_hash = tx.get("source_hash", "")
     return {
         "id": tx["transaction_id"],
         "date": tx["date"],
@@ -508,12 +517,24 @@ def serialize_transaction(tx: Dict[str, Any]) -> Dict[str, Any]:
         "amount": round_money(float(tx["amount"])),
         "cashflow_direction": int(tx["cashflow_direction"]),
         "description": tx["description"],
+        "alias": account.get("alias", account.get("account_number", "")),
+        "balance": round_money(float(tx["balance"])),
+        "account_code": account_code,
+        "account_number": account.get("account_number", ""),
+        "type_code": type_code,
+        "currency": tx.get("currency", ""),
+        "raw_text": tx.get("raw_text", ""),
+        "processed_at": tx.get("processed_at", ""),
+        "source_hash": source_hash,
+        "file_name": hash_to_filename.get(source_hash, ""),
     }
 
 
 def build_dataset(
     transactions_raw: List[Dict[str, Any]],
     account_codes: List[str],
+    accounts_by_code: Dict[str, Dict[str, Any]],
+    hash_to_filename: Dict[str, str],
     logger: logging.Logger,
     account_targets: Optional[Dict[str, str]] = None,
     filter_currency: Optional[str] = None,
@@ -559,6 +580,8 @@ def build_dataset(
     transactions_output = build_transactions_output(
         account_codes,
         transactions_by_account,
+        accounts_by_code,
+        hash_to_filename,
         include_total=include_total,
     )
 
@@ -598,6 +621,14 @@ def main() -> None:
         account_codes = [item["account_code"] for item in accounts_raw]
     else:
         account_codes = sorted({tx["account_code"] for tx in transactions_raw})
+
+    accounts_by_code = {item["account_code"]: item for item in accounts_raw}
+
+    parsed_path = db_dir / "parsed.json"
+    hash_to_filename: Dict[str, str] = {}
+    if parsed_path.exists():
+        for entry in load_json(parsed_path):
+            hash_to_filename[entry["file_hash"]] = entry["file_name"]
 
     account_defaults = {
         item["account_code"]: item.get("default_currency") for item in accounts_raw
@@ -648,6 +679,8 @@ def main() -> None:
     global_dataset = build_dataset(
         transactions_raw,
         account_codes,
+        accounts_by_code,
+        hash_to_filename,
         logger,
         account_targets=global_targets,
         fx_rates=fx_rates,
@@ -660,6 +693,8 @@ def main() -> None:
     local_dataset = build_dataset(
         transactions_raw,
         account_codes,
+        accounts_by_code,
+        hash_to_filename,
         logger,
         account_targets=local_targets,
         fx_rates=fx_rates,
@@ -673,6 +708,8 @@ def main() -> None:
         filtered_dataset = build_dataset(
             transactions_raw,
             account_codes,
+            accounts_by_code,
+            hash_to_filename,
             logger,
             filter_currency=currency_code,
             include_total=True,
