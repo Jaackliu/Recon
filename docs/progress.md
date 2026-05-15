@@ -26,7 +26,7 @@
 - Created `src/backend/prompts/parse_transactions.txt` — AI prompt template with account injection.
 - Created `src/backend/parser.py` — full pipeline:
   - PDF → image rendering via PyMuPDF (`get_pixmap` at 200 DPI)
-  - Multimodal API call to mimo-v2.5 via Anthropic SDK (Mimo proxy)
+  - Multimodal API call via Anthropic SDK (model/base_url configured in `.env`)
   - JSON response parsing with markdown fence stripping
   - Transaction ID generation (`TX-{code}-{YYYYMMDD}-{seq}`)
   - Deduplication: drop new txns whose (account_code, date) already exist
