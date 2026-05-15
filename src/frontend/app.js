@@ -77,8 +77,7 @@ const dom = {
   netflowValue: document.getElementById("netflowValue"),
   inflowValue: document.getElementById("inflowValue"),
   outflowValue: document.getElementById("outflowValue"),
-  inflowRatio: document.getElementById("inflowRatio"),
-  outflowRatio: document.getElementById("outflowRatio"),
+  refundValue: document.getElementById("refundValue"),
   transferValue: document.getElementById("transferValue"),
   heatmapLegend: document.getElementById("heatmapLegend"),
   donutLegend: document.getElementById("donutLegend"),
@@ -1291,16 +1290,15 @@ function updateCashflow(slice) {
   const inflow = sumBy(slice, "all_inflow");
   const outflow = sumBy(slice, "all_outflow");
   const netflow = round2(inflow + outflow);
-  const transfer = sumBy(slice, "net_internal_transfer");
+  const refund = round2(sumBy(slice, "refund") / 2);
+  const transferRaw = sumBy(slice, "internal_transfer");
+  const transfer = state.account === "total" ? round2(transferRaw / 2) : transferRaw;
 
   dom.netflowValue.textContent = formatMoney(netflow);
   dom.inflowValue.textContent = formatMoney(inflow);
   dom.outflowValue.textContent = formatMoney(outflow);
+  dom.refundValue.textContent = formatMoney(refund);
   dom.transferValue.textContent = formatMoney(transfer);
-
-  const startBalance = slice[0].start_balance;
-  dom.inflowRatio.textContent = formatRatio(inflow, startBalance, "+");
-  dom.outflowRatio.textContent = formatRatio(outflow, startBalance, "-");
 }
 
 function percentile(arr, p) {
@@ -1556,6 +1554,7 @@ function updateSankey() {
   const range = getRange(series);
   const filtered = transactions
     .filter((item) => item.is_filtered)
+    .filter((item) => item.type !== "refund" && item.type !== "transfer")
     .filter((item) => item.date >= range.startDate && item.date <= range.endDate);
 
   if (filtered.length === 0) {
@@ -1646,6 +1645,7 @@ function updateCategoryPanel() {
   const range = getRange(series);
   const filtered = transactions
     .filter((item) => item.is_filtered)
+    .filter((item) => item.type !== "refund" && item.type !== "transfer")
     .filter((item) => item.type === state.categoryType)
     .filter((item) => item.date >= range.startDate && item.date <= range.endDate);
 
@@ -1772,7 +1772,8 @@ function bindChartInteractions() {
 
   state.charts.donut.on("click", (params) => {
     if (!params || !params.name) return;
-    openCategoryDetail(params.name, state.categoryType);
+    const englishCat = untranslateCategory(params.name);
+    openCategoryDetail(englishCat, state.categoryType);
   });
 }
 
@@ -1843,8 +1844,7 @@ function openCategoryDetail(category, categoryType) {
     { label: t("detail.transactions"), value: String(transactions.length) },
     { label: t("detail.totalAmount"), value: formatMoney(total) }
   ]);
-  dom.detailFilters.style.display = "flex";
-  syncDetailFilters();
+  dom.detailFilters.style.display = "none";
   dom.detailSort.value = state.detail.sort;
   renderDetailList();
   openDetailModal();
@@ -1898,8 +1898,9 @@ function getDetailTransactions() {
     const range = getRange(series);
     filtered = filtered
       .filter((item) => item.category === state.detail.category)
-      .filter((item) => item.date >= range.startDate && item.date <= range.endDate)
-      .filter((item) => state.detail.filters[item.type]);
+      .filter((item) => item.type !== "refund" && item.type !== "transfer")
+      .filter((item) => item.type === state.detail.categoryType)
+      .filter((item) => item.date >= range.startDate && item.date <= range.endDate);
   }
 
   if (state.detail.sort === "amount") {
@@ -2041,7 +2042,7 @@ function convertDataset(dataset, rate) {
 
 const AMOUNT_KEYS = new Set([
   "start_balance", "end_balance",
-  "all_inflow", "all_outflow", "net_internal_transfer",
+  "all_inflow", "all_outflow", "refund", "internal_transfer",
   "filtered_inflow", "filtered_outflow",
   "amount", "inflow", "outflow", "net_inflow",
   "balance"
@@ -2221,12 +2222,6 @@ function formatSignedMoney(value, direction) {
   return `${sign}${formatMoney(value)}`;
 }
 
-function formatRatio(value, base, sign) {
-  if (!base) return "--";
-  const ratio = (value / base) * 100;
-  const prefix = sign === "+" && ratio >= 0 ? "+" : "";
-  return `${prefix}${ratio.toFixed(1)}%`;
-}
 
 function formatType(type) {
   return t("type." + type) || type;
@@ -2262,6 +2257,7 @@ function showEmptyDashboard() {
   dom.netflowValue.textContent = "--";
   dom.inflowValue.textContent = "--";
   dom.outflowValue.textContent = "--";
+  dom.refundValue.textContent = "--";
   dom.transferValue.textContent = "--";
 }
 

@@ -171,6 +171,50 @@
 - 多语言：新增 `msg.parse_refresh_done` 翻译（zh/en/fr）。
 - 文档：更新 `docs/process.md` 中 `processor.py` 运行方式说明。
 
+## 2026-05-15 (Bug Fix: 模块G饼状图详情弹窗)
+
+- **问题**：模块G（分类占比）饼状图点击扇区后，详情弹窗始终显示"暂无交易记录"。
+- **根因**：甜甜圈图的 `params.name` 是翻译后的类别名称（如"食品"），但 `getDetailTransactions` 函数中比较的是英文类别键（如"Food"），导致匹配失败返回空数组。桑基图已正确使用 `untranslateCategory` 处理，但甜甜圈图遗漏了。
+- **修复**：在 `bindChartInteractions` 中甜甜圈图点击事件添加 `untranslateCategory(params.name)` 转换，与桑基图保持一致。
+
+## 2026-05-15 (模块F/G交易类型过滤优化)
+
+- **需求**：模块F（桑基图）和模块G（甜甜圈图）点击类别时，需要基于交易类型进行精确过滤。
+- **修改内容**：
+  - `updateSankey()` 函数：添加过滤条件排除 `refund`(3) 和 `transfer`(4) 类型交易，这些交易不参与桑基图计算。
+  - `updateCategoryPanel()` 函数：添加过滤条件排除 `refund`(3) 和 `transfer`(4) 类型交易，这些交易不参与甜甜圈图计算。
+  - `getDetailTransactions()` 函数：
+    - 日详情模式：排除 `refund` 和 `transfer` 类型，保留用户选择的过滤器。
+    - 类别详情模式：排除 `refund` 和 `transfer` 类型，强制只保留与 `state.detail.categoryType` 匹配的交易类型（income 或 expense）。
+- **效果**：
+  - 桑基图点击收入类别或甜甜圈图选择收入类型时，只显示该类别的收入交易。
+  - 桑基图点击支出类别或甜甜圈图选择支出类型时，只显示该类别的支出交易。
+  - 退款和内部转账记录完全从模块F和G的计算和显示中排除。
+
+## 2026-05-15 (模块F/G详情弹窗移除过滤器)
+
+- **修改**：`openCategoryDetail()` 函数中移除交易类型过滤器显示（`dom.detailFilters.style.display = "none"`）。
+- **原因**：模块F和G的类别详情弹窗已强制按 `categoryType` 过滤，无需用户手动切换过滤器。
+
+## 2026-05-15 (Bug Fix: 模块E日详情弹窗)
+
+- **问题**：模块E（日详情）弹窗也错误地排除了交易类型3（refund）和4（transfer）。
+- **根因**：在 `getDetailTransactions()` 的 day 模式下错误添加了排除 refund 和 transfer 的过滤条件。
+- **修复**：移除 day 模式下的排除过滤条件，只在 category 模式下排除。模块E应显示所有交易类型，模块F/G才禁止显示类型3、4。
+
+## 2026-05-15 (模块B现金流概况修改)
+
+- **需求1**：删除流入金额和流出金额右侧附属显示的百分比 `(本期流入金额 / 本期期初余额) * 100%`。
+- **需求2**：将"净内部转账"改为"内部转账"，计算方式改为：交易类型为 4（内部转账）的所有交易的金额绝对值相加。总资产视图下除以 2（同一笔转账在两个账户各记一次），特定账户视图不除以 2。
+- **需求3**：新增"撤销/报销"行，位于流出与内部转账之间。交易类型为 3（撤销/报销）的所有交易的金额绝对值相加后除以 2，不论账户选择。
+- **前端修改**：
+  - `index.html`：移除 `inflowRatio`、`outflowRatio` 元素；新增撤销/报销行（`refundValue`）；`data-multi-lang` 从 `cashflow.netTransfer` 改为 `cashflow.transfer`。
+  - `app.js`：移除 `dom.inflowRatio`、`dom.outflowRatio` 及 `formatRatio`；新增 `dom.refundValue`；`updateCashflow` 中 refund 计算 `sumBy(slice, "refund") / 2`，transfer 仅总资产视图除以 2；`AMOUNT_KEYS` 新增 `refund`。
+  - `multi-lang.json`：新增 `cashflow.refund`（zh: 撤销/报销, en: Refund/Reimbursement, fr: Remboursement）；`cashflow.netTransfer` 重命名为 `cashflow.transfer`。
+- **后端修改**：
+  - `processor.py`：新增 `REFUND_CODE = 3` 常量；`build_daily_series` 新增 `refund` 字段（`abs(refund_inflow) + abs(refund_outflow)`）；`build_total_series` 同步新增。
+- **文档更新**：`frontend.md`（模块B指标描述）、`process.md`（ui_daily_series.json schema 示例字段名）。
+
 ## Plan
 
 - [x] Implement src/backend/processor.py to generate UI JSON files.

@@ -120,7 +120,8 @@
         "end_balance": 50500.00,
         "all_inflow": 2000.00,
         "all_outflow": -1500.00,
-        "net_internal_transfer": 500.00,
+        "refund": 200.00,
+        "internal_transfer": 500.00,
         "filtered_inflow": 1000.00,
         "filtered_outflow": -500.00
       }
@@ -134,7 +135,8 @@
         "end_balance": 8200.00,
         "all_inflow": 400.00,
         "all_outflow": -200.00,
-        "net_internal_transfer": 0.00,
+        "refund": 0.00,
+        "internal_transfer": 0.00,
         "filtered_inflow": 300.00,
         "filtered_outflow": -100.00
       }
@@ -148,7 +150,8 @@
         "end_balance": 50500.00,
         "all_inflow": 2000.00,
         "all_outflow": -1500.00,
-        "net_internal_transfer": 500.00,
+        "refund": 200.00,
+        "internal_transfer": 500.00,
         "filtered_inflow": 1000.00,
         "filtered_outflow": -500.00
       }

@@ -16,6 +16,7 @@ TYPE_LABELS = {
 }
 
 FILTERED_TYPE_CODES = {1, 2}
+REFUND_CODE = 3
 INTERNAL_TRANSFER_CODE = 4
 DEFAULT_DATASET_KEY = "default"
 DEFAULT_LOCAL_KEY = "default_local"
@@ -311,6 +312,8 @@ def build_daily_series(
         all_outflow = 0.0
         filtered_inflow = 0.0
         filtered_outflow = 0.0
+        refund_inflow = 0.0
+        refund_outflow = 0.0
         internal_inflow = 0.0
         internal_outflow = 0.0
 
@@ -328,6 +331,12 @@ def build_daily_series(
                     all_inflow += signed
                 else:
                     all_outflow += signed
+
+                if int(tx["type_code"]) == REFUND_CODE:
+                    if signed >= 0:
+                        refund_inflow += signed
+                    else:
+                        refund_outflow += signed
 
                 if int(tx["type_code"]) in FILTERED_TYPE_CODES:
                     if signed >= 0:
@@ -349,7 +358,8 @@ def build_daily_series(
             end_balance = start_balance
             last_balance = end_balance
 
-        internal_net = internal_inflow + internal_outflow
+        refund = abs(refund_inflow) + abs(refund_outflow)
+        internal_transfer = abs(internal_inflow) + abs(internal_outflow)
 
         daily.append(
             {
@@ -358,7 +368,8 @@ def build_daily_series(
                 "end_balance": round_money(end_balance),
                 "all_inflow": round_money(all_inflow),
                 "all_outflow": round_money(all_outflow),
-                "net_internal_transfer": round_money(internal_net),
+                "refund": round_money(refund),
+                "internal_transfer": round_money(internal_transfer),
                 "filtered_inflow": round_money(filtered_inflow),
                 "filtered_outflow": round_money(filtered_outflow),
             }
@@ -395,7 +406,8 @@ def build_total_series(account_series: Dict[str, List[Dict[str, Any]]]) -> List[
             "end_balance": 0.0,
             "all_inflow": 0.0,
             "all_outflow": 0.0,
-            "net_internal_transfer": 0.0,
+            "refund": 0.0,
+            "internal_transfer": 0.0,
             "filtered_inflow": 0.0,
             "filtered_outflow": 0.0,
         }
@@ -408,7 +420,8 @@ def build_total_series(account_series: Dict[str, List[Dict[str, Any]]]) -> List[
             totals["end_balance"] += float(entry["end_balance"])
             totals["all_inflow"] += float(entry["all_inflow"])
             totals["all_outflow"] += float(entry["all_outflow"])
-            totals["net_internal_transfer"] += float(entry["net_internal_transfer"])
+            totals["refund"] += float(entry["refund"])
+            totals["internal_transfer"] += float(entry["internal_transfer"])
             totals["filtered_inflow"] += float(entry["filtered_inflow"])
             totals["filtered_outflow"] += float(entry["filtered_outflow"])
 
@@ -419,7 +432,8 @@ def build_total_series(account_series: Dict[str, List[Dict[str, Any]]]) -> List[
                 "end_balance": round_money(totals["end_balance"]),
                 "all_inflow": round_money(totals["all_inflow"]),
                 "all_outflow": round_money(totals["all_outflow"]),
-                "net_internal_transfer": round_money(totals["net_internal_transfer"]),
+                "refund": round_money(totals["refund"]),
+                "internal_transfer": round_money(totals["internal_transfer"]),
                 "filtered_inflow": round_money(totals["filtered_inflow"]),
                 "filtered_outflow": round_money(totals["filtered_outflow"]),
             }
