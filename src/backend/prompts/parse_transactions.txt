@@ -63,7 +63,7 @@ Income categories: External Transfer, Salary, Scholarship, Subsidy, Tax & Intere
 A concise summary of the transaction in the format: purpose/content(if applicable)-merchant name/counterparty(if applicable).
 Keep it under 30 characters when possible.
 The language of the description MUST match the primary language of the bank statement.
-For example: if the statement is primarily in Chinese, write the description in Chinese; if primarily in English, use English; and so on for any other language.
+For example: if the statement is primarily in English, write the description in English; if primarily in Chinese, use Chinese; and so on for any other language.
 
 ### raw_text
 The original text line or fragment from the statement that describes this transaction.

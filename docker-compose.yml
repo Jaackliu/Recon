@@ -9,6 +9,8 @@ services:
       - ./data_users:/app/data_users
       - ./users.json:/app/users.json
       - ./.env:/app/.env:ro
+    environment:
+      - TZ=Asia/Shanghai
     env_file:
       - .env
     healthcheck:
