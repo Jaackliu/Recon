@@ -1,0 +1,19 @@
+services:
+  finance-dashboard:
+    build: .
+    container_name: finance-dashboard
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data_users:/app/data_users
+      - ./users.json:/app/users.json
+      - ./.env:/app/.env:ro
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

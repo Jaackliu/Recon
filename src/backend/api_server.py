@@ -21,6 +21,12 @@ PYTHON = sys.executable
 app = Flask(__name__)
 CORS(app)
 
+
+@app.route("/health")
+def health():
+    return jsonify({"status": "ok"})
+
+
 # ---------------------------------------------------------------------------
 # User registry
 # ---------------------------------------------------------------------------
@@ -409,3 +415,19 @@ if __name__ == "__main__":
         (d / "logs").mkdir(parents=True, exist_ok=True)
     _schedule_all_users()
     app.run(host="0.0.0.0", port=8000, debug=False)
+
+
+# ---------------------------------------------------------------------------
+# Gunicorn hooks (used when running via gunicorn)
+# ---------------------------------------------------------------------------
+
+def on_starting(server):
+    """Create per-user log directories before workers are forked."""
+    for user in load_users():
+        d = ROOT / user["data_dir"]
+        (d / "logs").mkdir(parents=True, exist_ok=True)
+
+
+def post_fork(server, worker):
+    """Start per-user daily scheduler in each worker process."""
+    _schedule_all_users()

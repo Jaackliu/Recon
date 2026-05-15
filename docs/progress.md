@@ -222,6 +222,21 @@
 - [x] Implement src/backend/parser.py for PDF parsing and transaction extraction.
 - [x] Validate outputs using real bank statement PDFs.
 
+## 2026-05-15 (Docker Compose 部署)
+
+- 新增 Docker Compose 部署方案，支持开机自动运行和崩溃自动重启。
+- 新增文件：
+  - `Dockerfile`：基于 `python:3.12-slim`，Gunicorn 作为生产级 WSGI 服务器。
+  - `docker-compose.yml`：挂载 `data_users/`、`users.json`、`.env`，`restart: unless-stopped` 策略。
+  - `.dockerignore`：排除 `.git`、`__pycache__`、`data_users/` 等非必要文件。
+- `requirements.txt` 补充缺失依赖：`python-dotenv`、`gunicorn`、`apscheduler`。
+- `api_server.py` 修改：
+  - 新增 `/health` 健康检查端点（返回 `{"status": "ok"}`）。
+  - 新增 Gunicorn hooks：`on_starting` 创建日志目录，`post_fork` 启动定时调度。
+  - 保留 `__main__` 块支持直接 `python api_server.py` 运行。
+- Gunicorn 配置：1 worker + `--preload`，timeout 1800 秒（30 分钟）。
+- Docker 健康检查：每 30 秒访问 `/health`，连续 3 次失败标记不健康。
+
 ## Notes
 - Processor implementation complete; ready to run against sample data.
 - Parser implementation complete; processes PDFs via multimodal AI API.
