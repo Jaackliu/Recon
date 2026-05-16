@@ -1,6 +1,8 @@
 # Finance Dashboard
 
-本地运行的轻量级多人记账与资产可视化平台。上传银行账单 PDF，AI 自动解析交易记录，生成交互式仪表盘。
+本地运行的轻量级记账与资产可视化平台。上传银行账单 PDF，AI 自动解析交易记录，生成交互式仪表盘。
+
+> **网络要求**：虽然所有数据均存储在本地，但前端页面依赖 CDN 加载第三方库（如 ECharts），因此使用时需要联网。此外，AI 解析 PDF 和汇率获取功能也需要网络连接。
 
 ---
 
@@ -129,6 +131,54 @@ bash load.sh
 3. **上传 PDF**（可选）：直接上传银行账单 PDF
 
 完成后系统自动创建配置文件并开始解析。
+
+### Docker 部署
+
+如果你不想手动安装 Python 环境和依赖，可以使用 Docker 一键部署。Docker 方案还能让服务在后台持久运行，并在宿主机重启或容器异常退出后自动恢复。
+
+#### Docker 环境要求
+
+- Docker 20.10+
+- Docker Compose v2+
+
+#### 1. 配置 AI API
+
+同上，先配置 `.env` 文件。
+
+#### 2. 注册用户
+
+同上，在项目根目录创建 `users.json`。
+
+#### 3. 构建并启动
+
+```bash
+docker compose up -d --build
+```
+
+启动后访问 `http://localhost:8000/`，使用方式与本地安装完全一致。
+
+#### 4. 常用命令
+
+| 操作 | 命令 |
+| :--- | :--- |
+| 查看日志 | `docker compose logs -f` |
+| 停止服务 | `docker compose down` |
+| 重启服务 | `docker compose restart` |
+| 更新后重新构建 | `docker compose up -d --build` |
+
+#### 数据持久化
+
+容器通过挂载宿主机目录实现数据持久化，以下路径会映射到容器内：
+
+| 宿主机路径 | 容器路径 | 说明 |
+| :--- | :--- | :--- |
+| `./data_users` | `/app/data_users` | 用户数据（账单、配置、日志等） |
+| `./users.json` | `/app/users.json` | 用户注册表 |
+| `./.env` | `/app/.env` | AI API 配置（只读） |
+
+> 容器默认设置时区为 `Asia/Shanghai`，如需更改请修改 `docker-compose.yml` 中的 `TZ` 环境变量。
+>
+> 容器配置了 `restart: unless-stopped` 策略：宿主机重启后容器会自动启动，运行中崩溃也会自动恢复。如需完全停止，使用 `docker compose down`。
 
 ---
 
