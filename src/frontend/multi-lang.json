@@ -212,7 +212,7 @@
     "cashflow.netflow": "Netflow",
     "cashflow.inflow": "Inflow",
     "cashflow.outflow": "Outflow",
-    "cashflow.refund": "Refund/Reimbursement",
+    "cashflow.refund": "Refund",
     "cashflow.transfer": "Internal transfer",
     "heatmap.title": "Heatmap",
     "heatmap.dailyNetInflow": "Daily net inflow",

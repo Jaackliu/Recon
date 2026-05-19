@@ -1400,6 +1400,7 @@ function updateHeatmap() {
   const theme = getChartTheme();
   const option = {
     tooltip: {
+      confine: true,
       formatter: (params) => `${formatDate(params.data[0])}<br/>${formatMoney(params.data[1])}`
     },
     visualMap: {
@@ -1460,6 +1461,10 @@ function updateMonthlyChart() {
   const option = {
     tooltip: {
       trigger: "axis",
+      confine: true,
+      padding: [4, 8],
+      textStyle: { fontSize: 11 },
+      extraCssText: "max-width:200px; font-size:11px; line-height:1.4;",
       axisPointer: {
         type: "line",
         snap: true
@@ -1543,6 +1548,7 @@ function updateDailyChart(slice) {
   const option = {
     tooltip: {
       trigger: "axis",
+      confine: true,
       axisPointer: {
         type: "line",
         snap: true
@@ -1681,6 +1687,7 @@ function updateSankey() {
   const option = {
     tooltip: {
       trigger: "item",
+      confine: true,
       formatter: (params) => {
         if (params.dataType === "edge") {
           return `${params.data.source} → ${params.data.target}<br/>${formatMoney(params.data.value)}`;
@@ -1729,6 +1736,7 @@ function updateCategoryPanel() {
   const option = {
     tooltip: {
       trigger: "item",
+      confine: true,
       formatter: (params) => `${params.name}<br/>${formatMoney(params.value)} (${params.percent}%)`
     },
     series: [
@@ -2445,10 +2453,21 @@ function positionTxTooltip(el, event) {
   const h = el.offsetHeight;
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  let x = event.clientX + pad;
-  let y = event.clientY - h - pad;
-  if (y < 0) y = event.clientY + pad;
-  if (x + w > vw) x = event.clientX - w - pad;
+  const cx = event.clientX;
+  const cy = event.clientY;
+
+  let x = cx + pad;
+  let y = cy - h - pad;
+
+  // Not enough space above → show below
+  if (y < 0) y = cy + pad;
+  // Not enough space below → show above
+  if (y + h > vh) y = cy - h - pad;
+  // Not enough space on the right → show on the left
+  if (x + w > vw) x = cx - w - pad;
+  // Not enough space on the left → show on the right
+  if (x < 0) x = cx + pad;
+
   el.style.left = x + "px";
   el.style.top = y + "px";
 }
