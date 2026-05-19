@@ -55,16 +55,10 @@ def user_data_dir(user_id: str) -> Path | None:
 # ---------------------------------------------------------------------------
 # Per-user message store
 # ---------------------------------------------------------------------------
-_messages: dict[str, list[dict]] = {}
-_lock = threading.Lock()
-
-
 def _add_message(user_id: str, key: str, params: dict | None = None):
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     msg = {"timestamp": ts, "key": key, "params": params or {}}
     data_dir = user_data_dir(user_id)
-    with _lock:
-        _messages.setdefault(user_id, []).insert(0, msg)
     if data_dir:
         notif_log = data_dir / "logs" / "notifications.jsonl"
         notif_log.parent.mkdir(parents=True, exist_ok=True)
@@ -116,9 +110,7 @@ def _parse_watcher(user_id: str):
         if ok:
             _add_message(user_id, "msg.parse_done", {"detail": info})
             # Auto-refresh: fetch FX rates and regenerate UI data
-            refresh_ok = _do_refresh(user_id, auto=False)
-            if refresh_ok:
-                _add_message(user_id, "msg.parse_refresh_done", {})
+            _do_refresh(user_id, auto=False)
         else:
             _add_message(user_id, "msg.parse_error", {"error": info})
     except Exception as exc:
@@ -135,21 +127,21 @@ def _parse_watcher(user_id: str):
 def _do_refresh(user_id: str, auto: bool = False):
     """Run fetch_fx.py + processor.py, record messages."""
     ok, info = _run_script("fetch_fx.py", user_id)
-    if ok:
-        _add_message(user_id, "msg.fx_done", {"detail": info})
-    else:
+    if not ok:
         _add_message(user_id, "msg.fx_error", {"error": info})
         return False
 
+    fx_detail = info
+
     ok, info = _run_script("processor.py", user_id)
-    if ok:
-        _add_message(user_id, "msg.processor_done", {})
-    else:
+    if not ok:
         _add_message(user_id, "msg.processor_error", {"error": info})
         return False
 
-    key = "msg.auto_refresh" if auto else "msg.refresh_done"
-    _add_message(user_id, key, {})
+    if auto:
+        _add_message(user_id, "msg.auto_refresh", {"fx_detail": fx_detail})
+    else:
+        _add_message(user_id, "msg.refresh_done", {"fx_detail": fx_detail})
     return True
 
 
@@ -289,8 +281,23 @@ def refresh_data(user_id):
 def get_messages(user_id):
     if not get_user(user_id):
         abort(404)
-    with _lock:
-        return jsonify(list(_messages.get(user_id, [])))
+    data_dir = user_data_dir(user_id)
+    if not data_dir:
+        return jsonify([])
+    notif_log = data_dir / "logs" / "notifications.jsonl"
+    if not notif_log.exists():
+        return jsonify([])
+    msgs = []
+    with notif_log.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                try:
+                    msgs.append(json.loads(line))
+                except json.JSONDecodeError:
+                    pass
+    msgs.reverse()
+    return jsonify(msgs)
 
 
 @app.route("/<user_id>/api/setup", methods=["POST"])

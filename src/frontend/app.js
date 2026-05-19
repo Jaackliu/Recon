@@ -319,12 +319,12 @@ function pollParseStatus() {
           const latest = msgs[0];
           if (latest.key === "msg.parse_error") {
             showToast(formatNotification(latest.key, latest.params), true);
-          } else if (latest.key === "msg.parse_refresh_done") {
+          } else if (latest.key === "msg.refresh_done") {
             // Full pipeline complete: parse + refresh → reload page
             showToast(t("toast.refreshDone"));
             setTimeout(() => location.reload(), 600);
           }
-          // If msg.parse_done but not msg.parse_refresh_done yet,
+          // If msg.parse_done but not msg.refresh_done yet,
           // the refresh is still running server-side; next manual
           // page load will pick up the new data.
         });
