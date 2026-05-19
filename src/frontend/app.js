@@ -57,6 +57,7 @@ const state = {
     transactions: {},
     currencyBreakdown: {},
     fxRates: {},
+    fxUpdatedAt: "",
     translations: {}
   },
   charts: {}
@@ -113,6 +114,7 @@ const dom = {
   notificationModal: document.getElementById("notificationModal"),
   closeNotificationModal: document.getElementById("closeNotificationModal"),
   notificationList: document.getElementById("notificationList"),
+  fxUpdatedTime: document.getElementById("fxUpdatedTime"),
   manageAccountsBtn: document.getElementById("manageAccountsBtn"),
   manageCurrenciesBtn: document.getElementById("manageCurrenciesBtn"),
   configListModal: document.getElementById("configListModal"),
@@ -371,6 +373,9 @@ function openSettingsModal() {
   dom.settingsModal.setAttribute("aria-hidden", "false");
   buildCurrencySelector();
   setActiveThemeOption();
+  if (dom.fxUpdatedTime) {
+    dom.fxUpdatedTime.textContent = state.data.fxUpdatedAt || "--";
+  }
 }
 
 function closeSettingsModal() {
@@ -710,6 +715,7 @@ async function init() {
     state.data.transactions = transactions;
     state.data.currencyBreakdown = currencyBreakdown;
     state.data.fxRates = fxRates.rates || {};
+    state.data.fxUpdatedAt = fxRates.updated_at || "";
 
     buildAccountList();
     bindEvents();

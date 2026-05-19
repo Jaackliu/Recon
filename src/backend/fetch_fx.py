@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
@@ -153,6 +154,7 @@ def build_fx_payload(
 
     return {
         "as_of": fx_snapshot.get("date", ""),
+        "updated_at": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
         "source": fx_snapshot.get("source", ""),
         "base_iso": fx_snapshot.get("base_iso", ""),
         "currencies": currencies,

@@ -383,6 +383,23 @@ input {
   gap: var(--space-base);
 }
 
+.settings-info {
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--hairline-soft);
+}
+
+.settings-fx-updated {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.settings-fx-time {
+  font-variant-numeric: tabular-nums;
+}
+
 .settings-section-title {
   font-weight: 600;
   font-size: 14px;

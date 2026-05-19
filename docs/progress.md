@@ -237,6 +237,18 @@
 - Gunicorn 配置：1 worker + `--preload`，timeout 1800 秒（30 分钟）。
 - Docker 健康检查：每 30 秒访问 `/health`，连续 3 次失败标记不健康。
 
+## 2026-05-19 (汇率更新时间显示)
+
+- 新增汇率更新时间显示功能：在 Settings 弹窗第一行显示汇率数据的最后更新时间。
+- 后端修改：
+  - `fetch_fx.py`：`build_fx_payload` 函数新增 `updated_at` 字段，格式为 `YYYY-MM-DDTHH:MM:SE`（24小时制），记录汇率数据的本地生成时间。
+- 前端修改：
+  - `index.html`：Settings 弹窗内容区第一行新增 `settings-info` 区块，包含 `fxUpdatedAt` 和 `fxUpdatedTime` 元素。
+  - `app.js`：新增 `dom.fxUpdatedTime` 引用；`state.data` 新增 `fxUpdatedAt` 字段；`init` 函数中从 `fx_rate.json` 读取 `updated_at`；`openSettingsModal` 函数中更新显示。
+  - `styles.css`：新增 `.settings-info`、`.settings-fx-updated`、`.settings-fx-time` 样式，使用 12px 字体和 `var(--muted)` 深灰色，保持设计语言一致。
+  - `multi-lang.json`：新增 `modal.fxRateUpdated` 翻译（zh: 汇率更新时间：, en: FX rates updated:, fr: Taux de change mis à jour :）。
+- 文档更新：`frontend.md` 设置弹窗内容说明。
+
 ## Notes
 - Processor implementation complete; ready to run against sample data.
 - Parser implementation complete; processes PDFs via multimodal AI API.

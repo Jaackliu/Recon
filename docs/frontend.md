@@ -76,6 +76,7 @@
 *   **位置**：位于左侧控制栏底部。
 *   **UI 形式**：带有齿轮图标的按钮，点击后打开设置弹窗。
 *   **设置弹窗内容**：
+    *   **汇率更新时间 (FX Rate Updated)**：第一行显示汇率数据的最后更新时间，格式为 `YYYY-MM-DDTHH:MM:SE`（24小时制）。数据来源为 `data/database/fx_rate.json` 的 `updated_at` 字段。
     *   **主题选择 (Appearance)**：提供三个选项 - “System”（跟随系统）、”Light”（浅色模式）、”Dark”（深色模式）。
     *   **默认货币选择 (Default Currency)**：显示所有可用货币选项，使用 `data/config/currency.json` 的 `currency_symbol` 和 `alias` 展示。
     *   **语言选择 (Language)**：提供三个选项 - “中文”、”English”、”Français”。切换后所有 UI 文本、账户/货币别名、交易类别名称即时翻译。翻译数据来自 `src/frontend/multi-lang.json`。
