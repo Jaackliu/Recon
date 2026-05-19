@@ -413,6 +413,7 @@ function closeNotificationModal() {
 function openSettingsModal() {
   dom.settingsModal.classList.add("is-open");
   dom.settingsModal.setAttribute("aria-hidden", "false");
+  dom.settingsButton.classList.add("is-spinning");
   buildCurrencySelector();
   setActiveThemeOption();
   setActiveSchemeOption();
@@ -424,6 +425,7 @@ function openSettingsModal() {
 function closeSettingsModal() {
   dom.settingsModal.classList.remove("is-open");
   dom.settingsModal.setAttribute("aria-hidden", "true");
+  dom.settingsButton.classList.remove("is-spinning");
 }
 
 function openConfigListModal(tab) {
@@ -1442,7 +1444,10 @@ function updateHeatmap() {
       type: "heatmap",
       coordinateSystem: "calendar",
       data
-    }]
+    }],
+    animation: true,
+    animationDuration: 600,
+    animationEasing: "cubicOut"
   };
 
   state.charts.heatmap.setOption(option, true);
@@ -1529,7 +1534,10 @@ function updateMonthlyChart() {
         itemStyle: { color: theme.ink },
         lineStyle: { width: 2 }
       }
-    ]
+    ],
+    animation: true,
+    animationDuration: 600,
+    animationEasing: "cubicOut"
   };
 
   state.charts.monthly.setOption(option, true);
@@ -1616,7 +1624,10 @@ function updateDailyChart(slice) {
         itemStyle: { color: theme.ink },
         lineStyle: { width: 2 }
       }
-    ]
+    ],
+    animation: true,
+    animationDuration: 600,
+    animationEasing: "cubicOut"
   };
 
   state.charts.daily.setOption(option, true);
@@ -1708,7 +1719,10 @@ function updateSankey() {
         nodeAlign: "justify",
         color: getChartTheme().palette
       }
-    ]
+    ],
+    animation: true,
+    animationDuration: 600,
+    animationEasing: "cubicOut"
   };
 
   state.charts.sankey.setOption(option, true);
@@ -1747,7 +1761,10 @@ function updateCategoryPanel() {
         label: { show: false },
         labelLine: { show: false }
       }
-    ]
+    ],
+    animation: true,
+    animationDuration: 600,
+    animationEasing: "cubicOut"
   };
 
   state.charts.donut.setOption(option, true);
@@ -1776,10 +1793,11 @@ function updateTransactionsView() {
     return;
   }
 
-  filtered.forEach((item) => {
+  filtered.forEach((item, index) => {
     const row = document.createElement("div");
     row.className = "transaction-row";
     row._txData = item;
+    if (index < 15) row.style.animationDelay = `${index * 20}ms`;
     row.innerHTML = `
       <div>
         <strong>${escapeHtml(item.description)}</strong>
@@ -1947,10 +1965,11 @@ function renderDetailList() {
     return;
   }
 
-  transactions.forEach((item) => {
+  transactions.forEach((item, index) => {
     const row = document.createElement("div");
     row.className = "detail-row";
     row._txData = item;
+    if (index < 15) row.style.animationDelay = `${index * 20}ms`;
     row.innerHTML = `
       <div><strong>${escapeHtml(item.description)}</strong><div class="meta">${escapeHtml(formatDate(item.date))}</div></div>
       <div><span class="tag category">${escapeHtml(translateCategory(item.category))}</span></div>
