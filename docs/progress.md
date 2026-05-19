@@ -249,6 +249,17 @@
   - `multi-lang.json`：新增 `modal.fxRateUpdated` 翻译（zh: 汇率更新时间：, en: FX rates updated:, fr: Taux de change mis à jour :）。
 - 文档更新：`frontend.md` 设置弹窗内容说明。
 
+## 2026-05-19 (日期格式设置)
+
+- 新增日期格式设置功能：用户可在 Settings 中选择日期显示方式。
+- 支持四种格式：`YYYY-MM-DD`（默认）、`YYYY/MM/DD`、`DD/MM/YYYY`、`MM/DD/YYYY`。
+- 前端修改：
+  - `app.js`：新增 `state.dateFormat`（从 `localStorage` 读取）；新增 `formatDate()` 辅助函数，将 ISO 日期转为目标格式；新增 `setActiveDateFormatOption()` 函数。所有日期显示位置均已使用 `formatDate()` 包裹：交易列表行、详情列表行、余额概览、时间范围摘要、详情弹窗标题与指标、Tooltip、热力图 Tooltip、每日图表 Tooltip。日期格式切换点击事件写入 `localStorage` 并触发 `updateAll()` 全量刷新。
+  - `index.html`：Settings 弹窗新增 Date Format 设置区块，含四个药丸按钮。
+  - `styles.css`：新增 `.date-format-selector` 和 `.date-format-option` 样式，与语言选择器风格一致。
+  - `multi-lang.json`：新增 `modal.dateFormat`（zh: 日期格式, en: Date Format, fr: Format de date）和 `toast.dateFormatUpdated` 翻译。
+- 文档更新：`frontend.md` 设置弹窗内容说明和数据持久化说明。
+
 ## Notes
 - Processor implementation complete; ready to run against sample data.
 - Parser implementation complete; processes PDFs via multimodal AI API.

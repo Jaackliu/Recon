@@ -80,10 +80,12 @@
     *   **主题选择 (Appearance)**：提供三个选项 - “System”（跟随系统）、”Light”（浅色模式）、”Dark”（深色模式）。
     *   **默认货币选择 (Default Currency)**：显示所有可用货币选项，使用 `data/config/currency.json` 的 `currency_symbol` 和 `alias` 展示。
     *   **语言选择 (Language)**：提供三个选项 - “中文”、”English”、”Français”。切换后所有 UI 文本、账户/货币别名、交易类别名称即时翻译。翻译数据来自 `src/frontend/multi-lang.json`。
+    *   **日期格式 (Date Format)**：提供四个选项 - “YYYY-MM-DD”、”YYYY/MM/DD”、”DD/MM/YYYY”、”MM/DD/YYYY”。切换后所有日期显示（交易列表、详情弹窗、余额概览、时间范围、图表 Tooltip 等）即时按新格式重新渲染。
 *   **数据持久化**：
     *   主题设置保存到 `localStorage` 的 `theme` 键。
     *   默认货币设置保存到 `localStorage` 的 `defaultCurrency` 键。
     *   语言设置保存到 `localStorage` 的 `language` 键，默认为 `”zh”`。
+    *   日期格式设置保存到 `localStorage` 的 `dateFormat` 键，默认为 `”YYYY-MM-DD”`。
 *   **默认币种语义**：设置的默认货币将用于”总资产 + 默认”视图的货币视角。前端加载 `fx_rate.json` 并读取 UI JSON 中的 `_meta.processor_default_currency`，当用户选择的默认货币与处理器默认货币不同时，自动对 `”default”` 数据集进行运行时汇率转换。
 
 ---

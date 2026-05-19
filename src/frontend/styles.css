@@ -333,6 +333,17 @@ input {
   display: flex;
   flex-direction: column;
   gap: var(--space-lg);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.settings-content::-webkit-scrollbar {
+  display: none;
+}
+
+#settingsModal .modal-card {
+  max-height: 85vh;
+  overflow: hidden;
 }
 
 .data-action-group {
@@ -525,6 +536,36 @@ input {
   font-weight: 600;
   font-size: 14px;
   color: var(--muted);
+}
+
+.date-format-selector {
+  display: flex;
+  gap: 8px;
+}
+
+.date-format-option {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 8px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--canvas);
+  cursor: pointer;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--body);
+  transition: all 0.2s ease;
+}
+
+.date-format-option:hover {
+  border-color: var(--rausch);
+}
+
+.date-format-option.is-active {
+  border-color: var(--rausch);
+  background: var(--delta-positive-bg);
 }
 
 .language-option.is-active .lang-icon {

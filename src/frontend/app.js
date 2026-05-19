@@ -22,6 +22,7 @@ const state = {
   account: null,
   currency: "default",
   language: localStorage.getItem("language") || "zh",
+  dateFormat: localStorage.getItem("dateFormat") || "YYYY-MM-DD",
   theme: localStorage.getItem("theme") || "system",
   rangeMode: "90",
   customRange: {
@@ -115,6 +116,7 @@ const dom = {
   closeNotificationModal: document.getElementById("closeNotificationModal"),
   notificationList: document.getElementById("notificationList"),
   fxUpdatedTime: document.getElementById("fxUpdatedTime"),
+  dateFormatList: document.getElementById("dateFormatList"),
   manageAccountsBtn: document.getElementById("manageAccountsBtn"),
   manageCurrenciesBtn: document.getElementById("manageCurrenciesBtn"),
   configListModal: document.getElementById("configListModal"),
@@ -170,6 +172,26 @@ function untranslateCategory(displayName) {
 
 function getDirectionLabel(direction) {
   return t("direction." + direction) || "";
+}
+
+function formatDate(isoDate) {
+  if (!isoDate || isoDate.length < 10) return isoDate || "";
+  const y = isoDate.slice(0, 4);
+  const m = isoDate.slice(5, 7);
+  const d = isoDate.slice(8, 10);
+  switch (state.dateFormat) {
+    case "YYYY/MM/DD": return `${y}/${m}/${d}`;
+    case "DD/MM/YYYY": return `${d}/${m}/${y}`;
+    case "MM/DD/YYYY": return `${m}/${d}/${y}`;
+    default: return `${y}-${m}-${d}`;
+  }
+}
+
+function setActiveDateFormatOption() {
+  if (!dom.dateFormatList) return;
+  dom.dateFormatList.querySelectorAll(".date-format-option").forEach((option) => {
+    option.classList.toggle("is-active", option.dataset.format === state.dateFormat);
+  });
 }
 
 function applyLanguage() {
@@ -310,7 +332,7 @@ function pollParseStatus() {
     } catch {
       // ignore polling errors
     }
-  }, 5000);
+  }, 1000);
 }
 
 async function handleRefreshData() {
@@ -669,6 +691,15 @@ document.addEventListener("click", (event) => {
     applyLanguage();
     reinitCharts();
     showToast(t("toast.languageUpdated"));
+  }
+  const dateFormatOption = event.target.closest(".date-format-option");
+  if (dateFormatOption) {
+    const format = dateFormatOption.dataset.format;
+    state.dateFormat = format;
+    localStorage.setItem("dateFormat", format);
+    setActiveDateFormatOption();
+    updateAll();
+    showToast(t("toast.dateFormatUpdated"));
   }
 });
 
@@ -1137,6 +1168,7 @@ function setInitialSelections() {
   setActiveCategoryToggle();
   setActiveThemeOption();
   setActiveLanguageOption();
+  setActiveDateFormatOption();
 }
 
 function setView(view) {
@@ -1217,9 +1249,9 @@ function updateRangeSummary() {
     return;
   }
   const range = getRange(series);
-  dom.rangeInfo.textContent = `${range.startDate} — ${range.endDate}`;
-  dom.rangeSummary.textContent = `${range.startDate} - ${range.endDate}`;
-  dom.lastUpdated.textContent = `${t("status.dataUpTo")} ${range.endDate}`;
+  dom.rangeInfo.textContent = `${formatDate(range.startDate)} — ${formatDate(range.endDate)}`;
+  dom.rangeSummary.textContent = `${formatDate(range.startDate)} - ${formatDate(range.endDate)}`;
+  dom.lastUpdated.textContent = `${t("status.dataUpTo")} ${formatDate(range.endDate)}`;
 }
 
 function updateDashboard() {
@@ -1250,7 +1282,7 @@ function updateBalanceOverview(series, slice, range) {
   const accountLabel = getAccountLabel(state.account);
   dom.balanceTitle.textContent = accountLabel;
   dom.balanceValue.textContent = formatMoney(lastEntry.end_balance);
-  dom.balanceMeta.textContent = `${t("balance.endBalanceOn")} ${range.endDate}`;
+  dom.balanceMeta.textContent = `${t("balance.endBalanceOn")} ${formatDate(range.endDate)}`;
 
   const delta = getDelta(series, range);
   if (delta.label === t("balance.changeHidden")) {
@@ -1337,7 +1369,7 @@ function updateHeatmap() {
   const theme = getChartTheme();
   const option = {
     tooltip: {
-      formatter: (params) => `${params.data[0]}<br/>${formatMoney(params.data[1])}`
+      formatter: (params) => `${formatDate(params.data[0])}<br/>${formatMoney(params.data[1])}`
     },
     visualMap: {
       min: -rangeAbs,
@@ -1485,7 +1517,7 @@ function updateDailyChart(slice) {
         snap: true
       },
       formatter: (params) => {
-        let result = params[0].axisValue + "<br/>";
+        let result = formatDate(params[0].axisValue) + "<br/>";
         params.forEach((p) => {
           result += `${p.marker} ${p.seriesName}: ${formatMoney(p.value)}<br/>`;
         });
@@ -1711,7 +1743,7 @@ function updateTransactionsView() {
     row.innerHTML = `
       <div>
         <strong>${escapeHtml(item.description)}</strong>
-        <div class="meta">${escapeHtml(item.date)}</div>
+        <div class="meta">${escapeHtml(formatDate(item.date))}</div>
       </div>
       <div class="meta">${escapeHtml(getAlias(item.alias))}</div>
       <div><span class="tag ${item.type}">${formatType(item.type)}</span></div>
@@ -1813,9 +1845,9 @@ function openDayDetail(date) {
 
   const netflow = round2(entry.all_inflow + entry.all_outflow);
   dom.detailTitle.textContent = t("detail.dailyDetails");
-  dom.detailSubtitle.textContent = `${date} · ${getAccountLabel(state.account)}`;
+  dom.detailSubtitle.textContent = `${formatDate(date)} · ${getAccountLabel(state.account)}`;
   renderDetailMetrics([
-    { label: t("detail.date"), value: date },
+    { label: t("detail.date"), value: formatDate(date) },
     { label: t("detail.endBalance"), value: formatMoney(entry.end_balance) },
     { label: t("detail.netflow"), value: formatMoney(netflow) },
     { label: t("detail.inflow"), value: formatMoney(entry.all_inflow) },
@@ -1843,10 +1875,10 @@ function openCategoryDetail(category, categoryType) {
   const typeLabel = formatType(categoryType);
 
   dom.detailTitle.textContent = `${typeLabel} ${t("detail.categorySuffix")}`;
-  dom.detailSubtitle.textContent = `${translateCategory(category)} · ${range.startDate} — ${range.endDate}`;
+  dom.detailSubtitle.textContent = `${translateCategory(category)} · ${formatDate(range.startDate)} — ${formatDate(range.endDate)}`;
   renderDetailMetrics([
     { label: t("detail.category"), value: translateCategory(category) },
-    { label: t("detail.range"), value: `${range.startDate} — ${range.endDate}` },
+    { label: t("detail.range"), value: `${formatDate(range.startDate)} — ${formatDate(range.endDate)}` },
     { label: t("detail.transactions"), value: String(transactions.length) },
     { label: t("detail.totalAmount"), value: formatMoney(total) }
   ]);
@@ -1880,7 +1912,7 @@ function renderDetailList() {
     row.className = "detail-row";
     row._txData = item;
     row.innerHTML = `
-      <div><strong>${escapeHtml(item.description)}</strong><div class="meta">${escapeHtml(item.date)}</div></div>
+      <div><strong>${escapeHtml(item.description)}</strong><div class="meta">${escapeHtml(formatDate(item.date))}</div></div>
       <div><span class="tag category">${escapeHtml(translateCategory(item.category))}</span></div>
       <div><span class="tag ${item.type}">${formatType(item.type)}</span></div>
       <div class="detail-amount">${formatSignedMoney(item.amount, item.cashflow_direction)}</div>
@@ -2345,7 +2377,7 @@ function showTxTooltip(tx, event) {
   const currencyLabel = currency ? `${getAlias(currency.alias)} (${currency.currency_symbol})` : tx.currency;
   const rows = [
     [t("tooltip.transactionId"), tx.id],
-    [t("tooltip.date"), tx.date],
+    [t("tooltip.date"), formatDate(tx.date)],
     [t("tooltip.accountCode"), tx.account_code],
     [t("tooltip.accountAlias"), getAlias(tx.alias)],
     [t("tooltip.typeCode"), `${tx.type_code} (${formatType(tx.type)})`],
