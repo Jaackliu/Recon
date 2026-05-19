@@ -24,6 +24,7 @@ const state = {
   language: localStorage.getItem("language") || "zh",
   dateFormat: localStorage.getItem("dateFormat") || "YYYY-MM-DD",
   theme: localStorage.getItem("theme") || "system",
+  scheme: localStorage.getItem("scheme") || "modern",
   rangeMode: "90",
   customRange: {
     start: "",
@@ -226,13 +227,22 @@ function getChartTheme() {
     hairlineSoft: s.getPropertyValue("--hairline-soft").trim(),
     canvas: s.getPropertyValue("--canvas").trim(),
     ink: s.getPropertyValue("--ink").trim(),
-    rausch: s.getPropertyValue("--rausch").trim(),
+    accent: s.getPropertyValue("--accent").trim(),
     heatmap: [
       s.getPropertyValue("--heatmap-0").trim(),
       s.getPropertyValue("--heatmap-1").trim(),
       s.getPropertyValue("--heatmap-2").trim(),
       s.getPropertyValue("--heatmap-3").trim(),
       s.getPropertyValue("--heatmap-4").trim()
+    ],
+    palette: [
+      s.getPropertyValue("--palette-0").trim(),
+      s.getPropertyValue("--palette-1").trim(),
+      s.getPropertyValue("--palette-2").trim(),
+      s.getPropertyValue("--palette-3").trim(),
+      s.getPropertyValue("--palette-4").trim(),
+      s.getPropertyValue("--palette-5").trim(),
+      s.getPropertyValue("--palette-6").trim()
     ]
   };
 }
@@ -247,6 +257,10 @@ function applyTheme(mode) {
   document.documentElement.setAttribute("data-theme", resolved);
 }
 
+function applyScheme(scheme) {
+  document.documentElement.setAttribute("data-scheme", scheme);
+}
+
 function reinitCharts() {
   Object.values(state.charts).forEach((chart) => {
     if (chart) chart.dispose();
@@ -259,6 +273,12 @@ function reinitCharts() {
 function setActiveThemeOption() {
   document.querySelectorAll(".theme-option").forEach((option) => {
     option.classList.toggle("is-active", option.dataset.theme === state.theme);
+  });
+}
+
+function setActiveSchemeOption() {
+  document.querySelectorAll(".scheme-option").forEach((option) => {
+    option.classList.toggle("is-active", option.dataset.scheme === state.scheme);
   });
 }
 
@@ -395,6 +415,7 @@ function openSettingsModal() {
   dom.settingsModal.setAttribute("aria-hidden", "false");
   buildCurrencySelector();
   setActiveThemeOption();
+  setActiveSchemeOption();
   if (dom.fxUpdatedTime) {
     dom.fxUpdatedTime.textContent = state.data.fxUpdatedAt || "--";
   }
@@ -682,6 +703,15 @@ document.addEventListener("click", (event) => {
     setActiveThemeOption();
     reinitCharts();
   }
+  const schemeOption = event.target.closest(".scheme-option");
+  if (schemeOption) {
+    const scheme = schemeOption.dataset.scheme;
+    state.scheme = scheme;
+    localStorage.setItem("scheme", scheme);
+    applyScheme(scheme);
+    setActiveSchemeOption();
+    reinitCharts();
+  }
   const langOption = event.target.closest(".language-option");
   if (langOption) {
     const lang = langOption.dataset.lang;
@@ -706,6 +736,7 @@ document.addEventListener("click", (event) => {
 async function init() {
   try {
     applyTheme(state.theme);
+    applyScheme(state.scheme);
 
     // Try loading multi-lang first (always available, shared asset)
     const multiLang = await fetchJson(DATA_PATHS.multiLang).catch(() => ({}));
@@ -813,7 +844,7 @@ function showOnboarding(currencies) {
   const uploadZone = document.getElementById("obUploadZone");
   const fileInput = document.getElementById("obFileInput");
   uploadZone.addEventListener("click", () => fileInput.click());
-  uploadZone.addEventListener("dragover", (e) => { e.preventDefault(); uploadZone.style.borderColor = "var(--rausch)"; });
+  uploadZone.addEventListener("dragover", (e) => { e.preventDefault(); uploadZone.style.borderColor = "var(--accent)"; });
   uploadZone.addEventListener("dragleave", () => { uploadZone.style.borderColor = ""; });
   uploadZone.addEventListener("drop", (e) => {
     e.preventDefault();
@@ -1472,7 +1503,7 @@ function updateMonthlyChart() {
         type: "bar",
         data: inflow,
         yAxisIndex: 1,
-        itemStyle: { color: theme.rausch },
+        itemStyle: { color: theme.accent },
         stack: "flow",
         barWidth: 4
       },
@@ -1558,7 +1589,7 @@ function updateDailyChart(slice) {
         type: "bar",
         data: inflow,
         yAxisIndex: 1,
-        itemStyle: { color: theme.rausch },
+        itemStyle: { color: theme.accent },
         stack: "daily",
         barMaxWidth: 6
       },
@@ -1668,7 +1699,7 @@ function updateSankey() {
         lineStyle: { color: "gradient", curveness: 0.5 },
         itemStyle: { borderWidth: 0 },
         nodeAlign: "justify",
-        color: palette
+        color: getChartTheme().palette
       }
     ]
   };
@@ -1688,10 +1719,11 @@ function updateCategoryPanel() {
     .filter((item) => item.date >= range.startDate && item.date <= range.endDate);
 
   const totals = groupByCategory(filtered);
+  const themePalette = getChartTheme().palette;
   const donutData = Object.entries(totals).map(([name, value], index) => ({
     name: translateCategory(name),
     value,
-    itemStyle: { color: palette[index % palette.length] }
+    itemStyle: { color: themePalette[index % themePalette.length] }
   }));
 
   const option = {

@@ -10,9 +10,15 @@
       href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
+    <script>
+      (function() {
+        var scheme = localStorage.getItem("scheme") || "modern";
+        document.documentElement.setAttribute("data-scheme", scheme);
+      })();
+    </script>
     <style>
       :root {
-        --rausch: #ff385c;
+        --accent: #ff385c;
         --ink: #222222;
         --body: #3f3f3f;
         --muted: #6a6a6a;
@@ -23,8 +29,17 @@
           rgba(0, 0, 0, 0.1) 0 4px 8px;
       }
 
+      :root[data-scheme="retro"] {
+        --accent: #aa2d00;
+        --ink: #181d26;
+        --body: #333840;
+        --muted: #41454d;
+        --surface-soft: #f8fafc;
+      }
+
       @media (prefers-color-scheme: dark) {
         :root {
+          --accent: #ff5a7a;
           --ink: #f0f0f0;
           --body: #c0c0c0;
           --muted: #888888;
@@ -33,6 +48,10 @@
           --canvas: #111111;
           --shadow: rgba(255, 255, 255, 0.04) 0 0 0 1px,
             rgba(0, 0, 0, 0.3) 0 2px 6px, rgba(0, 0, 0, 0.4) 0 4px 8px;
+        }
+        :root[data-scheme="retro"] {
+          --accent: #fcab79;
+          --surface-soft: #1a1a1a;
         }
       }
 
@@ -108,7 +127,7 @@
         width: 56px;
         height: 56px;
         border-radius: 50%;
-        background: var(--rausch);
+        background: var(--accent);
         color: #fff;
         display: flex;
         align-items: center;
@@ -154,7 +173,7 @@
         })
         .catch(() => {
           document.getElementById("userList").innerHTML =
-            '<p style="color:var(--rausch)">Failed to load user list.</p>';
+            '<p style="color:var(--accent)">Failed to load user list.</p>';
         });
 
       function escapeHtml(str) {

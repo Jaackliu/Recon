@@ -15,7 +15,7 @@
   - Implement layout per docs/frontend.md and draft.png.
   - Bind data from data/ui and data/database JSON files.
   - Implement time range, account, sort, and filter interactions.
-  - Apply Airbnb-inspired visual system (Rausch accent, soft radii, single shadow tier).
+  - Apply Airtable-inspired visual system (coral accent #aa2d00, near-black primary #181d26, white canvas).
 - Status:
   - Frontend scaffold and data bindings completed.
   - UI sizing and chart axis/legend tweaks applied.
@@ -259,6 +259,25 @@
   - `styles.css`：新增 `.date-format-selector` 和 `.date-format-option` 样式，与语言选择器风格一致。
   - `multi-lang.json`：新增 `modal.dateFormat`（zh: 日期格式, en: Date Format, fr: Format de date）和 `toast.dateFormatUpdated` 翻译。
 - 文档更新：`frontend.md` 设置弹窗内容说明和数据持久化说明。
+
+## 2026-05-19 (双配色方案：现代 / 复古)
+
+- 新增双配色方案系统，用户可在 Settings 中选择"现代"或"复古"风格。
+- CSS 变量重命名：`--rausch` / `--rausch-active` → `--accent` / `--accent-active`（全局替换）。
+- 两个配色方案独立于 light/dark 主题，通过 `data-scheme` 属性控制：
+  - **现代 (modern)**：Airbnb 风格，accent #ff385c，ink #222222，暖色系标签和热力图。
+  - **复古 (retro)**：Airtable 风格，accent #aa2d00（signature-coral），ink #181d26，冷暖结合标签。
+- CSS 选择器架构：
+  - `:root` — 浅色现代（默认）
+  - `:root[data-scheme="retro"]` — 浅色复古
+  - `[data-theme="dark"]` — 深色现代
+  - `[data-theme="dark"][data-scheme="retro"]` — 深色复古
+- 新增 `--palette-0` ~ `--palette-6` CSS 变量，图表调色板改为从 CSS 动态读取。
+- Settings 弹窗新增"配色方案"选择区域，含两个药丸按钮（现代 swatch #ff385c / 复古 swatch #aa2d00）。
+- 新增翻译键：`modal.colorScheme`、`modal.modern`、`modal.retro`（zh/en/fr）。
+- 新增函数：`applyScheme()`、`setActiveSchemeOption()`。
+- 状态持久化：`localStorage("scheme")`，默认 `"modern"`。
+- 修改文件：`styles.css`、`index.html`、`app.js`、`landing.html`、`multi-lang.json`、`progress.md`、`structure.md`
 
 ## Notes
 - Processor implementation complete; ready to run against sample data.

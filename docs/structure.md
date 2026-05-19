@@ -694,7 +694,7 @@ _schedule_next() → 重新调度明天 04:00
 
 **功能**：
 - 调用 `GET /api/users` 获取用户列表
-- 渲染用户卡片网格（Airbnb 风格设计）
+- 渲染用户卡片网格（Airtable 风格设计）
 - 点击卡片跳转到 `/<user_id>/`
 
 #### 3.2.2 `index.html` — Dashboard 主页面
@@ -787,7 +787,7 @@ state = {
 
 | 特性 | 实现 |
 | :--- | :--- |
-| 设计风格 | Airbnb 风格（Rausch 强调色 #ff385c） |
+| 设计风格 | Airtable 风格（Coral 强调色 #aa2d00） |
 | 字体 | Plus Jakarta Sans（Google Fonts） |
 | 主题 | CSS 自定义属性，支持 light/dark/system |
 | 布局 | 12 列网格，响应式断点 1200px/900px/640px |

@@ -11,6 +11,8 @@
           ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
           : theme;
         document.documentElement.setAttribute("data-theme", resolved);
+        var scheme = localStorage.getItem("scheme") || "modern";
+        document.documentElement.setAttribute("data-scheme", scheme);
       })();
     </script>
     <link rel="stylesheet" href="styles.css" />
@@ -370,6 +372,19 @@
                   </svg>
                 </span>
                 <span data-multi-lang="modal.dark">Dark</span>
+              </button>
+            </div>
+          </div>
+          <div class="settings-section">
+            <div class="settings-section-title" data-multi-lang="modal.colorScheme">Color Scheme</div>
+            <div class="scheme-selector">
+              <button class="scheme-option" data-scheme="modern">
+                <span class="scheme-swatch" style="background:#ff385c"></span>
+                <span data-multi-lang="modal.modern">Modern</span>
+              </button>
+              <button class="scheme-option" data-scheme="retro">
+                <span class="scheme-swatch" style="background:#aa2d00"></span>
+                <span data-multi-lang="modal.retro">Retro</span>
               </button>
             </div>
           </div>
