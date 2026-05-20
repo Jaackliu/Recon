@@ -70,8 +70,8 @@
   --tag-income-fg: #aa2d00;
   --tag-expense-bg: rgba(24, 29, 38, 0.08);
   --tag-expense-fg: #181d26;
-  --tag-refund-bg: rgba(10, 46, 14, 0.12);
-  --tag-refund-fg: #0a2e0e;
+  --tag-refund-bg: rgba(45, 106, 62, 0.14);
+  --tag-refund-fg: #2d6a3e;
   --tag-transfer-bg: rgba(27, 97, 201, 0.12);
   --tag-transfer-fg: #1b61c9;
   --heatmap-0: #1b61c9;
@@ -900,15 +900,10 @@ input {
   font-variant-numeric: tabular-nums;
 }
 
-.balance-meta {
-  font-size: 12px;
-  color: var(--muted);
-}
-
 .account-breakdown {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
   overflow-y: auto;
   flex: 1;
   min-height: 0;
@@ -918,9 +913,9 @@ input {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--body);
-  padding: 8px 10px;
+  padding: 4px 8px;
   border-radius: var(--radius-sm);
   background: var(--surface-soft);
 }

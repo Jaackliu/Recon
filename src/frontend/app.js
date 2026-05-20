@@ -74,7 +74,6 @@ const dom = {
   lastUpdated: document.getElementById("lastUpdated"),
   balanceTitle: document.getElementById("balanceTitle"),
   balanceValue: document.getElementById("balanceValue"),
-  balanceMeta: document.getElementById("balanceMeta"),
   balanceDelta: document.getElementById("balanceDelta"),
   accountBreakdown: document.getElementById("accountBreakdown"),
   netflowValue: document.getElementById("netflowValue"),
@@ -1315,7 +1314,6 @@ function updateBalanceOverview(series, slice, range) {
   const accountLabel = getAccountLabel(state.account);
   dom.balanceTitle.textContent = accountLabel;
   dom.balanceValue.textContent = formatMoney(lastEntry.end_balance);
-  dom.balanceMeta.textContent = `${t("balance.endBalanceOn")} ${formatDate(range.endDate)}`;
 
   const delta = getDelta(series, range);
   if (delta.label === t("balance.changeHidden")) {
@@ -2348,7 +2346,6 @@ function renderDonutLegend(data) {
 function showEmptyDashboard() {
   dom.balanceTitle.textContent = t("status.noData");
   dom.balanceValue.textContent = "--";
-  dom.balanceMeta.textContent = "";
   dom.balanceDelta.textContent = "";
   dom.accountBreakdown.innerHTML = "";
   dom.netflowValue.textContent = "--";

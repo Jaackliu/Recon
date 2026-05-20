@@ -279,6 +279,12 @@
 - 状态持久化：`localStorage("scheme")`，默认 `"modern"`。
 - 修改文件：`styles.css`、`index.html`、`app.js`、`landing.html`、`multi-lang.json`、`progress.md`、`structure.md`
 
+## 2026-05-21 (前端样式微调)
+
+- **模块A账户列表收窄**：`.account-breakdown` gap 从 8px 减至 4px，`.account-row` padding 从 8px 10px 减至 4px 8px，font-size 从 13px 减至 12px，使列表行更紧凑。
+- **模块A移除期末余额日期行**：删除余额概览卡片中 `balanceMeta`（"期末余额 {日期}"）元素及相关代码、翻译键和 CSS。
+- **Retro 配色 refund 颜色调整**：浅色 retro 方案 `--tag-refund-fg` 从 `#0a2e0e`（极深绿，近黑灰）调整为 `#2d6a3e`（中绿色），`--tag-refund-bg` 从 `rgba(10,46,14,0.12)` 调整为 `rgba(45,106,62,0.14)`，使 refund 标签与灰色系更易区分。深色 retro 方案不变（`#a8d8c4` 已足够明亮）。
+
 ## Notes
 - Processor implementation complete; ready to run against sample data.
 - Parser implementation complete; processes PDFs via multimodal AI API.
