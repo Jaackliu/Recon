@@ -76,13 +76,20 @@
 *   **位置**：位于左侧控制栏底部。
 *   **UI 形式**：带有齿轮图标的按钮，点击后打开设置弹窗。
 *   **设置弹窗内容**：
-    *   **汇率更新时间 (FX Rate Updated)**：第一行显示汇率数据的最后更新时间，格式为 `YYYY-MM-DDTHH:MM:SE`（24小时制）。数据来源为 `data/database/fx_rate.json` 的 `updated_at` 字段。
+    *   **汇率更新时间 (FX Rate Updated)**：第一行显示汇率数据的最后更新时间，格式为 `YYYY-MM-DDTHH:MM:SS`（24小时制）。数据来源为 `data/database/fx_rate.json` 的 `updated_at` 字段。
     *   **主题选择 (Appearance)**：提供三个选项 - “System”（跟随系统）、”Light”（浅色模式）、”Dark”（深色模式）。
+    *   **配色方案 (Color Scheme)**：提供两个选项 - “现代”（Modern，accent #ff385c）和 “复古”（Retro，accent #aa2d00）。两个方案独立于 light/dark 主题。
     *   **默认货币选择 (Default Currency)**：显示所有可用货币选项，使用 `data/config/currency.json` 的 `currency_symbol` 和 `alias` 展示。
     *   **语言选择 (Language)**：提供三个选项 - “中文”、”English”、”Français”。切换后所有 UI 文本、账户/货币别名、交易类别名称即时翻译。翻译数据来自 `src/frontend/multi-lang.json`。
     *   **日期格式 (Date Format)**：提供四个选项 - “YYYY-MM-DD”、”YYYY/MM/DD”、”DD/MM/YYYY”、”MM/DD/YYYY”。切换后所有日期显示（交易列表、详情弹窗、余额概览、时间范围、图表 Tooltip 等）即时按新格式重新渲染。
+    *   **配置管理 (Config Management)**：提供”管理账户”和”管理货币”按钮，点击后弹出配置列表弹窗，支持在线添加、编辑和删除账户/货币配置。
+    *   **操作按钮**：
+        *   **上传 PDF (Upload)**：点击后打开文件选择器，支持上传银行账单 PDF 到用户的 `raw_input/` 目录。
+        *   **解析 PDF (Parse PDF)**：点击后触发完整数据管线（`parser.py` → `fetch_fx.py` → `processor.py`），解析完成后自动刷新页面。
+        *   **刷新数据 (Refresh Data)**：点击后手动触发 `fetch_fx.py` + `processor.py`，更新汇率和前端数据。
 *   **数据持久化**：
     *   主题设置保存到 `localStorage` 的 `theme` 键。
+    *   配色方案保存到 `localStorage` 的 `scheme` 键，默认为 `”modern”`。
     *   默认货币设置保存到 `localStorage` 的 `defaultCurrency` 键。
     *   语言设置保存到 `localStorage` 的 `language` 键，默认为 `”zh”`。
     *   日期格式设置保存到 `localStorage` 的 `dateFormat` 键，默认为 `”YYYY-MM-DD”`。

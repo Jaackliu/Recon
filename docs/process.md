@@ -60,7 +60,7 @@
         { "date": "2023-10-01", "net_inflow": 1500.00 }
       ],
       "monthly_combo": [
-        { "month": "2023-10", "end_balance": 54000.00, "inflow": 12000.00, "outflow": 8000.00 }
+        { "month": "2023-10", "end_balance": 54000.00, "inflow": 12000.00, "outflow": -8000.00 }
       ]
     },
     "001": {
@@ -68,7 +68,7 @@
         { "date": "2023-10-01", "net_inflow": 120.00 }
       ],
       "monthly_combo": [
-        { "month": "2023-10", "end_balance": 3200.00, "inflow": 800.00, "outflow": 560.00 }
+        { "month": "2023-10", "end_balance": 3200.00, "inflow": 800.00, "outflow": -560.00 }
       ]
     }
   },
@@ -78,7 +78,7 @@
         { "date": "2023-10-01", "net_inflow": 120.00 }
       ],
       "monthly_combo": [
-        { "month": "2023-10", "end_balance": 3200.00, "inflow": 800.00, "outflow": 560.00 }
+        { "month": "2023-10", "end_balance": 3200.00, "inflow": 800.00, "outflow": -560.00 }
       ]
     }
   },
@@ -88,7 +88,7 @@
         { "date": "2023-10-01", "net_inflow": 1500.00 }
       ],
       "monthly_combo": [
-        { "month": "2023-10", "end_balance": 54000.00, "inflow": 12000.00, "outflow": 8000.00 }
+        { "month": "2023-10", "end_balance": 54000.00, "inflow": 12000.00, "outflow": -8000.00 }
       ]
     },
     "001": {
@@ -96,7 +96,7 @@
         { "date": "2023-10-01", "net_inflow": 120.00 }
       ],
       "monthly_combo": [
-        { "month": "2023-10", "end_balance": 3200.00, "inflow": 800.00, "outflow": 560.00 }
+        { "month": "2023-10", "end_balance": 3200.00, "inflow": 800.00, "outflow": -560.00 }
       ]
     }
   }
@@ -188,7 +188,7 @@
 *   **现金流方向**：每条交易必须包含 `cashflow_direction`，供 Transactions 列表页决定金额正负。
 *   **账户别名**：每条交易必须包含 `alias`，来自 `accounts.json` 对应账户的 `alias` 字段。
 *   **帐户余额**：每条交易必须包含 `balance`，为该笔交易后的帐户余额。
-*   **原始字段**：每条交易额外携带 `account_code`、`account_number`、`type_code`、`currency`、`raw_text`、`processed_at`、`source_hash`，供前端 tooltip 展示完整交易信息。
+*   **原始字段**：每条交易额外携带 `account_code`、`account_number`、`type_code`、`currency`、`raw_text`、`processed_at`、`source_hash`、`file_name`，供前端 tooltip 展示完整交易信息。
 
 ```json
 {
@@ -212,7 +212,8 @@
           "currency": "01",
           "raw_text": "消费 支付宝-麦当劳",
           "processed_at": "2026-05-12T23:15:24+08:00",
-          "source_hash": "ff9e1399..."
+          "source_hash": "ff9e1399...",
+          "file_name": "statement_202310.pdf"
         }
       ]
     }
@@ -237,7 +238,8 @@
           "currency": "01",
           "raw_text": "消费 支付宝-麦当劳",
           "processed_at": "2026-05-12T23:15:24+08:00",
-          "source_hash": "ff9e1399..."
+          "source_hash": "ff9e1399...",
+          "file_name": "statement_202310.pdf"
         }
       ]
     }
@@ -262,7 +264,8 @@
           "currency": "01",
           "raw_text": "消费 支付宝-麦当劳",
           "processed_at": "2026-05-12T23:15:24+08:00",
-          "source_hash": "ff9e1399..."
+          "source_hash": "ff9e1399...",
+          "file_name": "statement_202310.pdf"
         }
       ]
     }

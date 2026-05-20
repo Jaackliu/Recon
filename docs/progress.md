@@ -67,7 +67,7 @@
 - Added `currency_iso` to `currency.json` for ISO 4217 mapping.
 - Added `fx_rate.json` schema to [docs/schema.md](docs/schema.md).
 - Created `src/backend/fetch_fx.py` to fetch Frankfurter rates and build full FX matrix.
-- Added `settings.json` with `global_default_currency` for total-asset default display.
+- Processor now determines `global_default_currency` from the first account's `default_currency` in `accounts.json` (stored as `_meta.processor_default_currency` in UI JSON files).
 - Processor now outputs currency-scoped UI datasets (`default`, `default_local`, and currency codes) with FX conversion and currency filtering.
 - Frontend now supports a currency selector and renders amounts using the active currency symbol.
 - Fixed default-currency aggregation to sum balances and cashflow across all supported currencies per account before total-asset rollup.

@@ -28,6 +28,7 @@
 | 字段名 | 键名 (Key) | 数据类型 | 说明 / 约束 |
 | :--- | :--- | :--- | :--- |
 | **数据日期** | `as_of` | String | 汇率日期，格式 `YYYY-MM-DD`。 |
+| **更新时间** | `updated_at` | String | 汇率数据的本地生成时间，格式 `YYYY-MM-DDTHH:MM:SS`（24小时制）。 |
 | **数据来源** | `source` | String | 数据源名称（例："Frankfurter (ECB)"）。 |
 | **查询基准币种** | `base_iso` | String | 请求第三方汇率接口时所用的 ISO 基准币种。 |
 | **货币清单** | `currencies` | Array[Object] | 与 `currency.json` 一致的币种清单，每个对象必须包含 `currency_code`、`currency_iso`、`alias`、`currency_symbol`。 |
