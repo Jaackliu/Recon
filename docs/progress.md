@@ -285,6 +285,16 @@
 - **模块A移除期末余额日期行**：删除余额概览卡片中 `balanceMeta`（"期末余额 {日期}"）元素及相关代码、翻译键和 CSS。
 - **Retro 配色 refund 颜色调整**：浅色 retro 方案 `--tag-refund-fg` 从 `#0a2e0e`（极深绿，近黑灰）调整为 `#2d6a3e`（中绿色），`--tag-refund-bg` 从 `rgba(10,46,14,0.12)` 调整为 `rgba(45,106,62,0.14)`，使 refund 标签与灰色系更易区分。深色 retro 方案不变（`#a8d8c4` 已足够明亮）。
 
+## 2026-05-21 (修复每日4点自动刷新)
+
+- **问题**：每日凌晨 4 点的自动刷新从未成功执行。日志中无任何 `msg.auto_refresh` 记录。
+- **根因**：`threading.Timer` 是纯内存定时器，Docker 容器重启后丢失；且 `_on_daily_tick` 中未捕获异常会导致定时链永久断裂。
+- **修复**：用 APScheduler (`BackgroundScheduler`) 替代 `threading.Timer`，使用 cron trigger 注册每天 4:00 任务。
+  - `misfire_grace_time=3600`：容器在 4:00-5:00 之间恢复时补执行。
+  - APScheduler 内置异常隔离，job 异常不影响调度器。
+  - 已安装 `apscheduler==3.11.2` 到 conda 环境。
+- 修改文件：`src/backend/api_server.py`
+
 ## Notes
 - Processor implementation complete; ready to run against sample data.
 - Parser implementation complete; processes PDFs via multimodal AI API.

@@ -6,9 +6,10 @@ import re
 import subprocess
 import sys
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
+from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask, jsonify, request, send_from_directory, abort
 from flask_cors import CORS
 
@@ -146,28 +147,22 @@ def _do_refresh(user_id: str, auto: bool = False):
 
 
 # ---------------------------------------------------------------------------
-# Per-user daily 4:00 AM scheduler
+# Per-user daily 4:00 AM scheduler (APScheduler)
 # ---------------------------------------------------------------------------
 
-def _schedule_all_users():
+def _start_scheduler():
+    scheduler = BackgroundScheduler(timezone="Asia/Shanghai")
     for user in load_users():
-        _schedule_next(user["id"])
-
-
-def _schedule_next(user_id: str):
-    now = datetime.now()
-    target = now.replace(hour=4, minute=0, second=0, microsecond=0)
-    if now >= target:
-        target += timedelta(days=1)
-    delay = (target - now).total_seconds()
-    timer = threading.Timer(delay, _on_daily_tick, args=(user_id,))
-    timer.daemon = True
-    timer.start()
-
-
-def _on_daily_tick(user_id: str):
-    _do_refresh(user_id, auto=True)
-    _schedule_next(user_id)
+        scheduler.add_job(
+            _do_refresh,
+            "cron",
+            hour=4, minute=0,
+            args=[user["id"], True],
+            id=f"daily_refresh_{user['id']}",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+    scheduler.start()
 
 
 # ---------------------------------------------------------------------------
@@ -420,7 +415,7 @@ if __name__ == "__main__":
     for user in load_users():
         d = ROOT / user["data_dir"]
         (d / "logs").mkdir(parents=True, exist_ok=True)
-    _schedule_all_users()
+    _start_scheduler()
     app.run(host="0.0.0.0", port=8000, debug=False)
 
 
@@ -437,4 +432,4 @@ def on_starting(server):
 
 def post_fork(server, worker):
     """Start per-user daily scheduler in each worker process."""
-    _schedule_all_users()
+    _start_scheduler()
