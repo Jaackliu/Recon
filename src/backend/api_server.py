@@ -103,13 +103,45 @@ _parse_status: dict[str, dict] = {}
 _parse_lock = threading.Lock()
 
 
+def _read_parse_summary(user_id: str) -> dict | None:
+    """Read parse_summary.json written by parser.py."""
+    data_dir = user_data_dir(user_id)
+    if not data_dir:
+        return None
+    summary_path = data_dir / "database" / "parse_summary.json"
+    if not summary_path.exists():
+        return None
+    try:
+        return json.loads(summary_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
 def _parse_watcher(user_id: str):
     """Run parser.py; on success, auto-run fetch_fx + processor."""
     ok = False
     try:
         ok, info = _run_script("parser.py", user_id)
         if ok:
-            _add_message(user_id, "msg.parse_done", {"detail": info})
+            summary = _read_parse_summary(user_id)
+            if summary and summary.get("failed_pdfs"):
+                failed = summary["failed_pdfs"]
+                failed_names = [f["file_name"] for f in failed]
+                failed_details = "; ".join(
+                    f'{f["file_name"]}: {f["reason"]}' for f in failed
+                )
+                success_count = summary.get("success_count", 0)
+                new_txn_count = summary.get("new_transaction_count", 0)
+                _add_message(user_id, "msg.parse_done_with_failures", {
+                    "success_count": success_count,
+                    "new_txn_count": new_txn_count,
+                    "failed_count": len(failed),
+                    "failed_names": ", ".join(failed_names),
+                    "failed_details": failed_details,
+                    "detail": info,
+                })
+            else:
+                _add_message(user_id, "msg.parse_done", {"detail": info})
             # Auto-refresh: fetch FX rates and regenerate UI data
             _do_refresh(user_id, auto=False)
         else:

@@ -295,12 +295,45 @@
   - 已安装 `apscheduler==3.11.2` 到 conda 环境。
 - 修改文件：`src/backend/api_server.py`
 
+## 2026-05-21 (PDF 解析失败详细通知)
+
+- **需求**：当 parser.py 中 PDF 解析失败时（包括所有 check_transaction 失败的情况），必须在 notification 中明确说明失败原因和失败文件。
+- **问题**：之前 parser.py 遇到解析失败的 PDF 时只在日志中记录，前端通知只显示最后一行 INFO 消息，用户无法得知哪些 PDF 失败以及失败原因。
+- **修改内容**：
+  - `parser.py`：
+    - 新增 `failed_pdfs` 和 `success_pdfs` 跟踪列表
+    - 新增 `_record_failure()` 辅助函数，在每个失败点（render_error、ai_no_response、ai_parse_error、no_valid_transactions、multi_account）记录详细信息
+    - 余额校验失败的 PDF 在 `run_balance_check_and_reparse` 返回后通过比对 `parsed_entries` 哈希集合检测
+    - 每次运行结束写入 `parse_summary.json` 到 `data/database/`
+    - 最终日志行包含成功/失败计数
+  - `api_server.py`：
+    - 新增 `_read_parse_summary()` 函数读取 `parse_summary.json`
+    - `_parse_watcher` 在 parser 成功后检查摘要：若有失败 PDF 则发送 `msg.parse_done_with_failures` 通知（包含成功数、新增交易数、失败数、失败文件名、失败原因详情）
+    - 若无失败则仍发送原来的 `msg.parse_done`
+  - `multi-lang.json`：新增 `msg.parse_done_with_failures` 翻译键（zh/en/fr）
+  - `docs/schema.md`：新增 `parse_summary.json` schema 文档，包含失败原因枚举说明
+- **失败原因枚举**：`render_error`、`ai_no_response`、`ai_parse_error`、`no_valid_transactions`、`multi_account`、`balance_check_failed`
+
 ## 2026-05-21 (修复 Retro 深色按钮高亮)
 
 - **问题**：选择 Retro 配色时，深色模式按钮高亮/点击颜色被现代配色覆盖。
 - **根因**：暗色主题 CSS 变量定义使用 `[data-theme="dark"]`，按钮元素本身含 `data-theme="dark"` 时会被误命中，导致变量落回 modern。
 - **修复**：将暗色主题变量选择器收窄为 `:root[data-theme="dark"]` 与 `:root[data-theme="dark"][data-scheme="retro"]`，并同步修正暗色表单选择器范围。
 - 修改文件：`src/frontend/styles.css`
+
+## 2026-05-21 (支持倒序银行账单 PDF)
+
+- **问题**：用户 lijiayi 的银行账单 `交易流水明细20260521153638.pdf` 无法通过 balance check，被反复重试 3 次后移除。
+- **根因**：该 PDF 的交易是严格倒序的（日期从近到远，每天的交易从晚上到白天）。AI 按 PDF 原始顺序返回交易，导致 `assign_transaction_ids` 按倒序分配序列号（最晚的交易得到 001），balance check 期望正序（从早到晚），因此全部失败。
+- **修复**：在 `parser.py` 中新增 `normalize_transaction_order` 函数，在分配 `transaction_id` 前检测并修正同一天内交易的顺序。
+  - `_check_balance_order(txns)`：检查交易列表的余额算术是否成立（`balance[i+1] == balance[i] + signed_amount[i+1]`）
+  - `normalize_transaction_order(raw_txns, logger)`：按 `(account, date, currency)` 分组，若当前顺序不满足余额算术但反转后满足，则反转该组交易
+  - 在 `parse_pdf` 函数中，`validate_single_account` 之后、`assign_transaction_ids` 之前调用
+- **修改文件**：
+  - `src/backend/parser.py`：新增两个函数，在 `parse_pdf` 中插入调用
+  - `src/backend/prompts/parse_transactions.txt`：添加注释说明系统会自动处理倒序
+  - `docs/schema.md`：更新余额一致性校验说明
+- **效果**：支持正序和倒序的银行账单 PDF，确保 `transaction_id` 序列号始终按时间正序分配
 
 ## Notes
 - Processor implementation complete; ready to run against sample data.

@@ -340,8 +340,17 @@ function pollParseStatus() {
             showToast(formatNotification(latest.key, latest.params), true);
           } else if (latest.key === "msg.refresh_done") {
             // Full pipeline complete: parse + refresh → reload page
-            showToast(t("toast.refreshDone"));
+            // Check if there were parse failures before showing success toast
+            const failureMsg = msgs.find((m) => m.key === "msg.parse_done_with_failures");
+            if (failureMsg) {
+              showToast(formatNotification(failureMsg.key, failureMsg.params), true);
+            } else {
+              showToast(t("toast.refreshDone"));
+            }
             setTimeout(() => location.reload(), 600);
+          } else if (latest.key === "msg.parse_done_with_failures") {
+            // Refresh still running but parse had failures — show warning now
+            showToast(formatNotification(latest.key, latest.params), true);
           }
           // If msg.parse_done but not msg.refresh_done yet,
           // the refresh is still running server-side; next manual

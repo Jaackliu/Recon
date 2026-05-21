@@ -42,6 +42,7 @@ ACCOUNTS_PATH = CONFIG_DIR / "accounts.json"
 CURRENCY_PATH = CONFIG_DIR / "currency.json"
 TRANSACTIONS_PATH = DB_DIR / "transactions.json"
 PARSED_PATH = DB_DIR / "parsed.json"
+PARSE_SUMMARY_PATH = DB_DIR / "parse_summary.json"
 
 # ---------------------------------------------------------------------------
 # Utilities
@@ -433,6 +434,97 @@ def validate_single_account(raw_txns: List[Dict[str, Any]], logger: logging.Logg
     return True
 
 
+def _check_balance_order(txns: List[Dict[str, Any]]) -> bool:
+    """Return True if balance arithmetic holds in the given order.
+
+    For each consecutive pair, checks:
+        balance[i+1] ≈ balance[i] + signed_amount[i+1]
+    where signed_amount is +amount for type_code==1 (income) and -amount for
+    type_code==2 (expense).
+
+    Returns True for groups with fewer than 2 transactions (trivially correct).
+    Returns False if any balance or amount is missing/invalid.
+    """
+    if len(txns) < 2:
+        return True
+
+    for i in range(len(txns) - 1):
+        try:
+            balance_i = round(float(txns[i]["balance"]), 2)
+            balance_next = round(float(txns[i + 1]["balance"]), 2)
+            amount_next = round(float(txns[i + 1]["amount"]), 2)
+            type_code = int(txns[i + 1].get("type_code", 2))
+        except (ValueError, TypeError, KeyError):
+            return False
+
+        signed = amount_next if type_code == 1 else -amount_next
+        expected = round(balance_i + signed, 2)
+        if abs(expected - balance_next) > 0.01:
+            return False
+
+    return True
+
+
+def normalize_transaction_order(
+    raw_txns: List[Dict[str, Any]],
+    logger: logging.Logger,
+) -> List[Dict[str, Any]]:
+    """Detect and fix descending within-day order.
+
+    Groups transactions by (account_code, date, currency).  For each group
+    with 2+ entries, checks whether the balance arithmetic holds in the
+    current order.  If it does not hold but holds after reversing, the
+    group is reversed in-place within the list.  This ensures that
+    assign_transaction_ids always assigns sequence numbers in ascending
+    chronological order regardless of the PDF's native sort direction.
+
+    Groups where neither order satisfies the arithmetic are left unchanged
+    (the balance-check retry logic will handle them).
+    """
+    if len(raw_txns) < 2:
+        return raw_txns
+
+    from collections import defaultdict
+
+    groups: Dict[Tuple[str, str, str], List[int]] = defaultdict(list)
+    for i, tx in enumerate(raw_txns):
+        account = str(tx.get("account_code", "")).strip()
+        date = str(tx.get("date", "")).strip()
+        currency = str(tx.get("currency", "01")).strip()
+        groups[(account, date, currency)].append(i)
+
+    reversed_count = 0
+    for key, indices in groups.items():
+        if len(indices) < 2:
+            continue
+
+        group_txns = [raw_txns[i] for i in indices]
+
+        if _check_balance_order(group_txns):
+            continue
+
+        reversed_group = list(reversed(group_txns))
+        if _check_balance_order(reversed_group):
+            for j, idx in enumerate(indices):
+                raw_txns[idx] = reversed_group[j]
+            reversed_count += 1
+            logger.info(
+                "Reversed descending order: account=%s date=%s currency=%s (%d txns)",
+                key[0], key[1], key[2], len(indices),
+            )
+        else:
+            logger.warning(
+                "Balance arithmetic inconsistent in both orders: "
+                "account=%s date=%s currency=%s (%d txns) — leaving unchanged",
+                key[0], key[1], key[2], len(indices),
+            )
+
+    if reversed_count:
+        logger.info("Normalized %d descending groups to ascending order", reversed_count)
+
+    return raw_txns
+
+
 def parse_pdf(
     pdf_path: Path,
     file_hash: str,
@@ -476,6 +568,8 @@ def parse_pdf(
     if not validate_single_account(raw_txns, logger):
         logger.error("Skipping %s due to multi-account violation", pdf_path.name)
         return [], None
+
+    raw_txns = normalize_transaction_order(raw_txns, logger)
 
     account_code = str(raw_txns[0].get("account_code", "")).strip()
     new_txns = assign_transaction_ids(raw_txns, seq_map, file_hash, processed_at)
@@ -593,6 +687,14 @@ def main() -> None:
     logger = setup_logger()
     logger.info("--- Parser started ---")
 
+    # Failure tracking
+    failed_pdfs: List[Dict[str, Any]] = []
+    success_pdfs: List[Dict[str, Any]] = []
+
+    def _record_failure(file_name: str, reason: str, detail: str = "") -> None:
+        failed_pdfs.append({"file_name": file_name, "reason": reason, "detail": detail})
+        logger.error("PARSE_FAILED: %s reason=%s detail=%s", file_name, reason, detail)
+
     # Load accounts
     if not ACCOUNTS_PATH.exists():
         logger.error("accounts.json not found at %s", ACCOUNTS_PATH)
@@ -665,25 +767,58 @@ def main() -> None:
 
     # Process each PDF
     for pdf_path, file_hash in unprocessed:
-        new_txns, parsed_entry = parse_pdf(
-            pdf_path,
-            file_hash,
-            system_prompt,
-            client,
-            api_key,
-            model,
-            base_url,
-            seq_map,
-            logger,
-            processed_at,
-        )
-        if not new_txns or not parsed_entry:
+        try:
+            images = render_pdf_to_images(pdf_path)
+            logger.info("Processing %s (%d pages, hash: %s...)", pdf_path.name, len(images), file_hash[:16])
+        except Exception as exc:
+            _record_failure(pdf_path.name, "render_error", str(exc)[:200])
             continue
+
+        response_text = call_ai_grouped(client, system_prompt, images, logger, api_key, model, base_url)
+        if not response_text:
+            _record_failure(pdf_path.name, "ai_no_response", "AI API returned no response")
+            continue
+
+        raw_txns = parse_ai_response(response_text)
+        if not raw_txns:
+            _record_failure(pdf_path.name, "ai_parse_error", "Failed to parse AI response as JSON")
+            continue
+
+        raw_txns = validate_transactions(raw_txns, logger)
+        if not raw_txns:
+            _record_failure(pdf_path.name, "no_valid_transactions", "No valid transactions after field validation")
+            continue
+
+        if not validate_single_account(raw_txns, logger):
+            _record_failure(pdf_path.name, "multi_account", "Multiple account codes found in single PDF")
+            continue
+
+        raw_txns = normalize_transaction_order(raw_txns, logger)
+        account_code = str(raw_txns[0].get("account_code", "")).strip()
+        new_txns = assign_transaction_ids(raw_txns, seq_map, file_hash, processed_at)
+
+        parsed_entry = {
+            "file_hash": file_hash,
+            "file_name": pdf_path.name,
+            "processed_at": processed_at,
+            "account_code": account_code,
+        }
         all_new_txns.extend(new_txns)
         new_parsed_entries.append(parsed_entry)
+        success_pdfs.append({"file_name": pdf_path.name, "transaction_count": len(new_txns)})
 
     if not all_new_txns:
-        logger.info("No new transactions extracted from any PDF.")
+        summary = {
+            "timestamp": processed_at,
+            "total_pdfs": len(unprocessed),
+            "new_pdfs": len(unprocessed),
+            "success_count": 0,
+            "new_transaction_count": 0,
+            "failed_pdfs": failed_pdfs,
+            "success_pdfs": [],
+        }
+        write_json(PARSE_SUMMARY_PATH, summary)
+        logger.info("No new transactions extracted from any PDF. Failed: %d", len(failed_pdfs))
         return
 
     # Deduplication
@@ -692,6 +827,16 @@ def main() -> None:
         logger.info("All new transactions were duplicates. Nothing to add.")
         parsed_entries.extend(new_parsed_entries)
         write_json(PARSED_PATH, parsed_entries)
+        summary = {
+            "timestamp": processed_at,
+            "total_pdfs": len(unprocessed),
+            "new_pdfs": len(unprocessed),
+            "success_count": len(success_pdfs),
+            "new_transaction_count": 0,
+            "failed_pdfs": failed_pdfs,
+            "success_pdfs": success_pdfs,
+        }
+        write_json(PARSE_SUMMARY_PATH, summary)
         return
 
     # Merge
@@ -712,6 +857,18 @@ def main() -> None:
         logger,
     )
 
+    # Track PDFs removed by balance check
+    final_hashes = {entry.get("file_hash") for entry in parsed_entries}
+    for entry in new_parsed_entries:
+        fh = entry.get("file_hash")
+        if fh and fh not in final_hashes:
+            fn = entry.get("file_name", fh)
+            # Remove from success_pdfs if present
+            success_pdfs = [s for s in success_pdfs if s["file_name"] != fn]
+            # Add to failed_pdfs if not already there
+            if not any(f["file_name"] == fn for f in failed_pdfs):
+                _record_failure(fn, "balance_check_failed", "Balance consistency check failed after retries")
+
     # Refund detection on full dataset
     detect_reclassify.detect_refunds(transactions, logger)
 
@@ -728,11 +885,24 @@ def main() -> None:
     write_json(TRANSACTIONS_PATH, transactions)
     write_json(PARSED_PATH, parsed_entries)
 
+    # Write summary
     new_accounts = sorted({tx["account_code"] for tx in all_new_txns})
     new_currencies = sorted({tx["currency"] for tx in all_new_txns})
-    logger.info("Done: +%d new txns from %d PDFs, total %d transactions (accounts: %s, currencies: %s)",
-                len(all_new_txns) + len(fee_txns), len(unprocessed), len(transactions),
-                ", ".join(new_accounts), ", ".join(new_currencies))
+    final_txn_count = sum(s["transaction_count"] for s in success_pdfs)
+    summary = {
+        "timestamp": processed_at,
+        "total_pdfs": len(unprocessed),
+        "new_pdfs": len(unprocessed),
+        "success_count": len(success_pdfs),
+        "new_transaction_count": final_txn_count,
+        "failed_pdfs": failed_pdfs,
+        "success_pdfs": success_pdfs,
+    }
+    write_json(PARSE_SUMMARY_PATH, summary)
+
+    logger.info("Done: +%d new txns from %d PDFs (success: %d, failed: %d), total %d transactions (accounts: %s, currencies: %s)",
+                final_txn_count + len(fee_txns), len(unprocessed), len(success_pdfs), len(failed_pdfs),
+                len(transactions), ", ".join(new_accounts), ", ".join(new_currencies))
 
 
 if __name__ == "__main__":
