@@ -92,7 +92,7 @@
   --palette-6: #f5e9d4;
 }
 
-[data-theme="dark"] {
+:root[data-theme="dark"] {
   --accent: #ff5a7a;
   --accent-active: #ff385c;
   --ink: #f0f0f0;
@@ -133,7 +133,7 @@
   --palette-6: #ff9aa7;
 }
 
-[data-theme="dark"][data-scheme="retro"] {
+:root[data-theme="dark"][data-scheme="retro"] {
   --accent: #fcab79;
   --accent-active: #aa2d00;
   --ink: #f0f0f0;
@@ -1636,8 +1636,8 @@ input {
 }
 
 /* Dark mode form element fixes */
-[data-theme="dark"] select,
-[data-theme="dark"] input {
+:root[data-theme="dark"] select,
+:root[data-theme="dark"] input {
   background: var(--canvas);
   border-color: var(--hairline);
 }

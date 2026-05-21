@@ -295,6 +295,13 @@
   - 已安装 `apscheduler==3.11.2` 到 conda 环境。
 - 修改文件：`src/backend/api_server.py`
 
+## 2026-05-21 (修复 Retro 深色按钮高亮)
+
+- **问题**：选择 Retro 配色时，深色模式按钮高亮/点击颜色被现代配色覆盖。
+- **根因**：暗色主题 CSS 变量定义使用 `[data-theme="dark"]`，按钮元素本身含 `data-theme="dark"` 时会被误命中，导致变量落回 modern。
+- **修复**：将暗色主题变量选择器收窄为 `:root[data-theme="dark"]` 与 `:root[data-theme="dark"][data-scheme="retro"]`，并同步修正暗色表单选择器范围。
+- 修改文件：`src/frontend/styles.css`
+
 ## Notes
 - Processor implementation complete; ready to run against sample data.
 - Parser implementation complete; processes PDFs via multimodal AI API.
