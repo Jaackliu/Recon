@@ -348,6 +348,23 @@
   - `docs/schema.md`：更新余额一致性校验说明
 - **效果**：支持正序和倒序的银行账单 PDF，确保 `transaction_id` 序列号始终按时间正序分配
 
+## 2026-05-21 (修复交易金额换行问题)
+
+- **问题**：Transactions 视图中，当交易金额超过4位数（含小数点共6位以上，如 `+1,234.56`）时，`+/-` 符号和金额数字被拆成两行显示。
+- **根因**：`.transaction-amount`、`.transaction-balance`、`.detail-amount`、`.detail-balance` 四个 CSS 类缺少 `white-space: nowrap`，导致长文本在 grid 单元格内自动换行。
+- **修复**：为上述四个 CSS 类添加 `white-space: nowrap`，确保符号与金额始终在同一行显示。
+- 修改文件：`src/frontend/styles.css`
+
+## 2026-05-21 (修复 Landing 页面深色模式 + Retro 配色文字不可见)
+
+- **问题**：深色模式 + Retro 配色下，Landing 页面文字颜色极深，与深色背景融合，几乎不可见。
+- **根因**：Landing 页面仅读取 `scheme`（配色）但未读取 `theme`（深色/浅色模式），深色模式 CSS 依赖 `@media (prefers-color-scheme: dark)` 而非 `data-theme="dark"` 属性。当用户在主应用手动选择深色模式时，Landing 页面无法感知，Retro 浅色模式的深色文字（`--ink: #181d26`）直接渲染在深色背景上。
+- **修复**：
+  - Script 块新增读取 `localStorage.theme`，解析 "system" 为实际偏好，设置 `data-theme` 属性。
+  - 添加 `prefers-color-scheme` 变化监听器，system 模式下自动响应系统主题切换。
+  - CSS 深色模式选择器从 `@media (prefers-color-scheme: dark)` 改为 `[data-theme="dark"]`，与主应用一致。
+- 修改文件：`src/frontend/landing.html`
+
 ## Notes
 - Processor implementation complete; ready to run against sample data.
 - Parser implementation complete; processes PDFs via multimodal AI API.

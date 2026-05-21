@@ -1233,12 +1233,14 @@ input {
 
 .transaction-amount {
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .transaction-balance {
   font-weight: 500;
   color: var(--muted);
   font-size: 13px;
+  white-space: nowrap;
 }
 
 .modal {
@@ -1418,6 +1420,7 @@ input {
 
 .detail-amount {
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .detail-account {
@@ -1430,6 +1433,7 @@ input {
   font-weight: 500;
   color: var(--muted);
   font-size: 13px;
+  white-space: nowrap;
 }
 
 .detail-empty {
