@@ -4,9 +4,11 @@ import base64
 import hashlib
 import json
 import logging
+import os
 import re
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -31,7 +33,7 @@ IMAGE_GROUP_SIZE = 2
 MAX_WORKERS = 10
 BALANCE_CHECK_MAX_RETRIES = 3
 
-TZ_CST = timezone(timedelta(hours=8))
+TZ_LOCAL = ZoneInfo(os.environ.get("TIMEZONE", "Asia/Shanghai"))
 
 PDF_DIR = RAW_INPUT_DIR
 PROMPT_PATH = Path(__file__).resolve().parent / "prompts" / "parse_transactions.txt"
@@ -546,7 +548,7 @@ def run_balance_check_and_reparse(
         reparsed_txns: List[Dict[str, Any]] = []
         reparsed_entries: List[Dict[str, Any]] = []
         seq_map = build_seq_map(transactions)
-        processed_at = datetime.now(TZ_CST).isoformat()
+        processed_at = datetime.now(TZ_LOCAL).isoformat()
 
         for file_hash in failed_hashes:
             pdf_path = pdf_hash_map.get(file_hash)
@@ -656,7 +658,7 @@ def main() -> None:
         return
     client = Anthropic(api_key=api_key, base_url=base_url)
 
-    processed_at = datetime.now(TZ_CST).isoformat()
+    processed_at = datetime.now(TZ_LOCAL).isoformat()
     seq_map = build_seq_map(transactions)
     all_new_txns: List[Dict[str, Any]] = []
     new_parsed_entries: List[Dict[str, Any]] = []

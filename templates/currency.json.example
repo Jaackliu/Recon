@@ -1,0 +1,32 @@
+[
+  {
+    "currency_code": "01",
+    "currency_iso": "CNY",
+    "alias": {"zh": "人民币", "en": "RMB", "fr": "RMB"},
+    "currency_symbol": "¥"
+  },
+  {
+    "currency_code": "02",
+    "currency_iso": "HKD",
+    "alias": {"zh": "港币", "en": "HKD", "fr": "HKD"},
+    "currency_symbol": "HK$"
+  },
+  {
+    "currency_code": "03",
+    "currency_iso": "EUR",
+    "alias": {"zh": "欧元", "en": "Euro", "fr": "Euro"},
+    "currency_symbol": "€"
+  },
+  {
+    "currency_code": "04",
+    "currency_iso": "USD",
+    "alias": {"zh": "美元", "en": "USD", "fr": "USD"},
+    "currency_symbol": "$"
+  },
+  {
+    "currency_code": "05",
+    "currency_iso": "JPY",
+    "alias": {"zh": "日元", "en": "JPY", "fr": "JPY"},
+    "currency_symbol": "JP¥"
+  }
+]

@@ -10,7 +10,7 @@ services:
       - ./users.json:/app/users.json
       - ./.env:/app/.env:ro
     environment:
-      - TZ=Asia/Shanghai
+      - TZ=${TIMEZONE:-Asia/Shanghai}
     env_file:
       - .env
     healthcheck:

@@ -151,7 +151,7 @@ def _do_refresh(user_id: str, auto: bool = False):
 # ---------------------------------------------------------------------------
 
 def _start_scheduler():
-    scheduler = BackgroundScheduler(timezone="Asia/Shanghai")
+    scheduler = BackgroundScheduler(timezone=os.environ.get("TIMEZONE", "Asia/Shanghai"))
     for user in load_users():
         scheduler.add_job(
             _do_refresh,
@@ -333,7 +333,6 @@ def setup_user(user_id):
             "account_name": account.get("account_name", ""),
             "bank_name": account.get("bank_name", ""),
             "account_number": account.get("account_number", ""),
-            "holder_name": account.get("holder_name", ""),
             "default_currency": account.get("default_currency", default_currency),
             "supported_currencies": account.get("supported_currencies", [default_currency]),
         })

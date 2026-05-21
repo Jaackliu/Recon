@@ -561,7 +561,6 @@ function buildAccountForm(acc) {
     <label class="field"><span>${t("onboarding.accountCode")}</span><input type="text" id="efAccountCode" value="${escapeHtml(acc.account_code || "")}" ${acc.account_code ? "readonly style='opacity:0.6'" : ""} placeholder="001" /></label>
     <label class="field"><span>${t("onboarding.bankName")}</span><input type="text" id="efBankName" value="${escapeHtml(acc.bank_name || "")}" /></label>
     <label class="field"><span>${t("onboarding.accountName")}</span><input type="text" id="efAccountName" value="${escapeHtml(acc.account_name || "")}" /></label>
-    <label class="field"><span>${t("onboarding.holderName")}</span><input type="text" id="efHolderName" value="${escapeHtml(acc.holder_name || "")}" /></label>
     <label class="field"><span>${t("onboarding.accountNumber")}</span><input type="text" id="efAccountNumber" value="${escapeHtml(acc.account_number || "")}" /></label>
     <label class="field"><span>${t("modal.aliasZh")}</span><input type="text" id="efAliasZh" value="${escapeHtml(alias.zh || "")}" /></label>
     <label class="field"><span>${t("modal.aliasEn")}</span><input type="text" id="efAliasEn" value="${escapeHtml(alias.en || "")}" /></label>
@@ -605,7 +604,6 @@ function saveEditConfig() {
       },
       account_name: document.getElementById("efAccountName").value.trim(),
       bank_name: document.getElementById("efBankName").value.trim(),
-      holder_name: document.getElementById("efHolderName").value.trim(),
       account_number: document.getElementById("efAccountNumber").value.trim(),
       default_currency: document.getElementById("efDefaultCurrency").value,
       supported_currencies: [...document.querySelectorAll("#efSupportedCurrencies input:checked")].map((cb) => cb.value),
@@ -931,7 +929,6 @@ async function obFinish() {
 
   const bankName = (document.getElementById("obBankName")?.value || "").trim();
   const accountName = (document.getElementById("obAccountName")?.value || "").trim();
-  const holderName = (document.getElementById("obHolderName")?.value || "").trim();
   const accountNumber = (document.getElementById("obAccountNumber")?.value || "").trim();
 
   // Build account data
@@ -942,7 +939,6 @@ async function obFinish() {
     alias: { zh: accountAlias, en: accountAlias, fr: accountAlias },
     account_name: accountName || bankName || "Account 1",
     bank_name: bankName,
-    holder_name: holderName,
     account_number: accountNumber,
     default_currency: obState.selectedCurrency,
     supported_currencies: [obState.selectedCurrency],

@@ -1,0 +1,20 @@
+[
+  {
+    "account_code": "001",
+    "alias": { "zh": "建行储蓄卡", "en": "CCB Card", "fr": "Carte CCB" },
+    "account_name": "中国建设银行储蓄卡",
+    "bank_name": "中国建设银行",
+    "account_number": "1234123412341234",
+    "default_currency": "01",
+    "supported_currencies": ["01"]
+  },
+  {
+    "account_code": "002",
+    "alias": { "zh": "汇丰 One", "en": "HSBC One", "fr": "HSBC One" },
+    "account_name": "HSBC One Account",
+    "bank_name": "HSBC",
+    "account_number": "123-123456-123",
+    "default_currency": "02",
+    "supported_currencies": ["01", "02", "03", "04"]
+  }
+]

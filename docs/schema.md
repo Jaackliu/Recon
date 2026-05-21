@@ -17,7 +17,7 @@
 | :--- | :--- | :--- | :--- |
 | **货币代码** | `currency_code` | String | **主键**。两位数字字符串（例："01"），全系统唯一。 |
 | **ISO 货币代码** | `currency_iso` | String | ISO 4217 三位大写字母（例："CNY"），用于汇率获取与跨系统对接。 |
-| **货币别名** | `alias` | Object | 用于前端展示的多语言对象，包含 `zh`、`en`、`fr` 三个键（例：`{"zh": "人民币", "en": "Chinese Yuan", "fr": "Yuan chinois"}`）。 |
+| **货币别名** | `alias` | Object | 用于前端展示的多语言对象，包含 `zh`、`en`、`fr` 三个键。建议使用简短名称，避免冗长全称（例：`{"zh": "人民币", "en": "RMB", "fr": "RMB"}`）。 |
 | **货币符号** | `currency_symbol` | String | 用于前端显示（例："￥"、"$"、"HK$"）。 |
 
 ### 1.1 `fx_rate.json` (汇率矩阵)
@@ -46,7 +46,6 @@
 | **账户名称** | `account_name` | String | 账户正式名称（例："招商银行借记卡"）。 |
 | **发行银行** | `bank_name` | String | 发卡行名称（例："招商银行"）。 |
 | **账号** | `account_number` | String | 银行卡号或统一账号。 |
-| **持有人名称** | `holder_name` | String | 账户持有人姓名。 |
 | **默认币种代码** | `default_currency` | String | `data/config/currency.json` 中已定义的 `currency_code`。 |
 | **支持币种代码** | `supported_currencies`| Array[String] | 包含支持的币种代码数组，元素必须为 `data/config/currency.json` 中已定义的 `currency_code`。 |
 

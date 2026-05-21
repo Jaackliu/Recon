@@ -28,39 +28,17 @@
 | **F. 资金流向桑基图** | 收入类别 → 总收入 → 总支出 → 支出类别，含动态平衡节点 | 是 |
 | **G. 分类占比** | 支出/收入各类别金额占比环形图 | 是 |
 
-### 多币种汇率转换规则
-
-系统为每个仪表盘模块预计算了三种货币视角，前端根据用户的账户和币种选择自动切换：
-
-| 场景 | 使用的数据集 | 汇率转换方式 |
-| :--- | :--- | :--- |
-| **总资产 + 默认** | `default` | 所有账户的全部交易按汇率矩阵转换为全局默认币种后汇总 |
-| **单账户 + 默认** | `default_local` | 该账户的全部交易按汇率矩阵转换为该账户的默认币种 |
-| **总资产 + 具体币种** | 对应币种代码（如 `01`） | 仅保留该币种的交易，不做汇率转换，直接汇总 |
-| **单账户 + 具体币种** | 对应币种代码（如 `01`） | 仅保留该账户该币种的交易，不做汇率转换 |
-
-> 用户还可在设置中更改"默认货币"。如果更改后的默认货币与后端处理器使用的默认货币不同，前端会在运行时自动对 `default` 数据集进行额外的汇率转换。
-
 ### 交互功能
 
 - **账户切换**：侧边栏选择"总资产"或任意单个银行账户
 - **货币切换**：选择"默认"（自动转换）或任意具体币种
 - **时间范围**：1W / 1M / 3M / 6M / 1Y / All / 自定义日期
-- **图表钻取**：
-  - 点击热力图日期 → 跳转到该日的自定义范围
-  - 点击月度图月份 → 跳转到该月的自定义范围
-  - 点击每日图日期 → 弹出当日所有交易详情
-  - 点击桑基图类别节点 → 弹出该类别所有交易详情
-  - 点击甜甜圈图扇区 → 弹出该类别所有交易详情
+- **图表钻取**：点击热力图/月度图/每日图日期跳转，点击桑基图/甜甜圈图类别弹出交易详情
 - **交易列表**：支持按时间/金额排序，按收入/支出/退款/转账筛选
-- **交易详情浮窗**：鼠标悬停任意交易行，显示完整字段（含交易 ID、原始文本、来源哈希等）
-- **主题切换**：浅色 / 深色 / 跟随系统
+- **主题切换**：浅色 / 深色 / 跟随系统；两种图表配色方案可选
 - **设置管理**：在线编辑账户配置和货币配置
-
-### 多用户与多语言
-
 - **多用户支持**：每个用户拥有完全隔离的数据目录，通过 Landing Page 选择身份进入
-- **三语支持**：界面支持中文、English、Français，账户和货币别名均为多语言对象
+- **三语支持**：界面支持简体中文、English、Français
 
 ### 局域网与远程访问
 
@@ -77,155 +55,85 @@
 
 ---
 
-## 快速开始
+## 配置指南
 
-### 环境要求
+部署前需要准备以下配置文件。项目提供了模板文件在 `templates/` 目录下，复制后按说明填写即可。
 
-- Python 3.10+
-- 依赖包见 `requirements.txt`
+### 配置文件一览
 
-### 1. 安装依赖
+| 文件 | 位置 | 作用 | 是否必须 |
+| :--- | :--- | :--- | :--- |
+| `.env` | 项目根目录 | AI API 密钥、模型配置和时区设置 | 是 |
+| `users.json` | 项目根目录 | 用户注册表（定义所有用户及其数据目录） | 是 |
+| `config/accounts.json` | 每个用户的数据目录内 | 银行账户配置（账户代码、银行名称、币种等） | 是（首次使用可由引导页自动创建） |
+| `config/currency.json` | 每个用户的数据目录内 | 货币配置（币种代码、ISO 代码、符号等） | 是（首次使用可由引导页自动创建） |
+
+### 方案一：手动配置 JSON（推荐）
+
+适合熟悉命令行的用户，直接编辑 JSON 文件完成所有配置。
+
+#### 步骤 1：配置 AI API
+
+从模板复制并编辑 `.env`：
 
 ```bash
-pip install -r requirements.txt
+cp templates/.env.example .env
 ```
 
-### 2. 配置 AI API
+编辑 `.env`，填入你的 AI API 信息：
 
-配置 `.env`，按照示例文件 `.env.example` 填入你的 API 信息。
+```text
+AI_MODEL=your-model-name          # 必须支持多模态图片输入
+AI_BASE_URL=https://your-api-endpoint/anthropic
+AI_API_KEY=sk-your-api-key
 
-> 系统使用 Anthropic SDK 调用 AI API，支持任何兼容 Anthropic Messages API 的端点。**所选模型必须支持多模态输入（图片）**，因为系统会将 PDF 页面渲染为 PNG 图片发送给 AI 进行识别，而非直接解析 PDF 文本。
+TIMEZONE=Asia/Shanghai            # 时区（影响定时任务和日志时间戳）
+```
 
-### 3. 注册用户
+> 系统使用 Anthropic SDK 调用 AI API，支持任何兼容 Anthropic Messages API 的端点。**所选模型必须支持多模态输入（图片）**，因为系统会将 PDF 页面渲染为 PNG 图片发送给 AI 进行识别。
 
-在项目根目录创建 `users.json`：
+#### 步骤 2：注册用户
+
+从模板复制并编辑 `users.json`：
+
+```bash
+cp templates/users.json.example users.json
+```
+
+编辑 `users.json`，为每个用户填写：
 
 ```json
 [
   {
-    "id": "your-id",
-    "name": "Your Name",
-    "data_dir": "data_users/your-id"
+    "id": "alice",
+    "name": "Alice",
+    "data_dir": "data_users/alice"
   }
 ]
 ```
 
-- `id`：用于 URL 路径（如 `http://localhost:8000/your-id/`），只允许小写字母、数字、连字符
-- `name`：显示名称
-- `data_dir`：该用户的数据目录路径（相对于项目根目录）
-
-### 4. 启动服务
-
-```bash
-bash load.sh
-```
-
-服务启动后访问 `http://localhost:8000/`，选择用户身份进入 Dashboard。
-
-### 5. 首次使用引导
-
-新用户进入 Dashboard 后会自动弹出 Onboarding 引导：
-
-1. **选择默认货币**：从预设列表中选择（如人民币、美元、港币等）
-2. **添加银行账户**：填写账户代码（如 `001`）、银行名称、账号、持有人等
-3. **上传 PDF**（可选）：直接上传银行账单 PDF
-
-完成后系统自动创建配置文件并开始解析。
-
-### Docker 部署
-
-如果你不想手动安装 Python 环境和依赖，可以使用 Docker 一键部署。Docker 方案还能让服务在后台持久运行，并在宿主机重启或容器异常退出后自动恢复。
-
-#### Docker 环境要求
-
-- Docker 20.10+
-- Docker Compose v2+
-
-#### 1. 配置 AI API
-
-同上，先配置 `.env` 文件。
-
-#### 2. 注册用户
-
-同上，在项目根目录创建 `users.json`。
-
-#### 3. 构建并启动
-
-```bash
-docker compose up -d --build
-```
-
-启动后访问 `http://localhost:8000/`，使用方式与本地安装完全一致。
-
-#### 4. 常用命令
-
-| 操作 | 命令 |
+| 字段 | 说明 |
 | :--- | :--- |
-| 查看日志 | `docker compose logs -f` |
-| 停止服务 | `docker compose down` |
-| 重启服务 | `docker compose restart` |
-| 更新后重新构建 | `docker compose up -d --build` |
+| `id` | 用户 ID，用于 URL 路径（如 `http://localhost:8000/alice/`），只允许小写字母、数字、连字符 |
+| `name` | 显示名称 |
+| `data_dir` | 数据目录路径（相对于项目根目录） |
 
-#### 数据持久化
+> **JSON 格式提示**：编辑 JSON 文件时请注意——整个文件用方括号 `[ ]` 包裹，每个账户/货币对象用花括号 `{ }` 包裹，字段之间用逗号 `,` 分隔。最后一个字段后面（结尾的 `]` 前）**不要**加逗号，否则会导致解析报错。
 
-容器通过挂载宿主机目录实现数据持久化，以下路径会映射到容器内：
+#### 步骤 3：配置银行账户和货币
 
-| 宿主机路径 | 容器路径 | 说明 |
-| :--- | :--- | :--- |
-| `./data_users` | `/app/data_users` | 用户数据（账单、配置、日志等） |
-| `./users.json` | `/app/users.json` | 用户注册表 |
-| `./.env` | `/app/.env` | AI API 配置（只读） |
+为每个用户创建数据目录和配置文件（将 `alice` 替换为你在 `users.json` 中设定的用户 ID）：
 
-> 容器默认设置时区为 `Asia/Shanghai`，如需更改请修改 `docker-compose.yml` 中的 `TZ` 环境变量。
->
-> 容器配置了 `restart: unless-stopped` 策略：宿主机重启后容器会自动启动，运行中崩溃也会自动恢复。如需完全停止，使用 `docker compose down`。
+```bash
+# 创建配置目录（其余子目录如 database/、ui/、raw_input/、logs/ 会在首次运行时自动生成）
+mkdir -p data_users/alice/config
 
----
-
-## 配置详解
-
-### `.env` — AI API 配置
-
-| 变量 | 说明 | 示例 |
-| :--- | :--- | :--- |
-| `AI_MODEL` | AI 模型名称（**必须支持多模态图片输入**） | `your-model-name` |
-| `AI_BASE_URL` | API 端点地址（兼容 Anthropic 格式） | `https://api.example.com/anthropic` |
-| `AI_API_KEY` | API 密钥 | `sk-...` |
-
-> 解析流程会将 PDF 每页渲染为 200 DPI 的 PNG 图片，以 base64 编码发送给 AI。因此所选模型必须具备图片理解能力，纯文本模型无法完成解析。
-
-### `users.json` — 用户注册表
-
-```json
-[
-  { "id": "alice", "name": "Alice", "data_dir": "data_users/alice" },
-  { "id": "bob",   "name": "Bob",   "data_dir": "data_users/bob" }
-]
+# 复制配置模板
+cp templates/accounts.json.example data_users/alice/config/accounts.json
+cp templates/currency.json.example data_users/alice/config/currency.json
 ```
 
-### 用户数据目录结构
-
-每个用户的数据目录按以下结构组织，**config 文件需要手动维护，其余均由系统自动生成**：
-
-```text
-data_users/<user_id>/
-├── config/                          # [手动] 配置文件
-│   ├── accounts.json                # 银行账户配置
-│   └── currency.json                # 货币配置
-├── database/                        # [自动生成] 核心数据
-│   ├── transactions.json            # 交易记录流水
-│   ├── parsed.json                  # 已解析文件记录
-│   └── fx_rate.json                 # 汇率矩阵
-├── ui/                              # [自动生成] 前端数据
-│   ├── ui_daily_series.json         # 每日时间序列
-│   ├── ui_static_charts.json        # 热力图 + 月度图
-│   ├── ui_transactions_and_categories.json  # 交易列表 + 分类
-│   └── ui_currency_breakdown.json   # 多币种余额明细
-├── raw_input/                       # [用户上传] 银行账单 PDF
-└── logs/                            # [自动生成] 运行日志
-```
-
-### `config/accounts.json` — 银行账户配置
+编辑 `data_users/alice/config/accounts.json`：
 
 ```json
 [
@@ -235,9 +143,8 @@ data_users/<user_id>/
     "account_name": "中国建设银行储蓄卡",
     "bank_name": "中国建设银行",
     "account_number": "1234567",
-    "holder_name": "张三",
     "default_currency": "01",
-    "supported_currencies": ["01", "02", "04"]
+    "supported_currencies": ["01", "02"]
   }
 ]
 ```
@@ -245,25 +152,22 @@ data_users/<user_id>/
 | 字段 | 说明 |
 | :--- | :--- |
 | `account_code` | 账户代码（三位数字字符串，全系统唯一） |
-| `alias` | 多语言显示别名 |
+| `alias` | 多语言显示别名（zh/en/fr） |
+| `account_name` | 账户全名（作为 AI 解析账单时的上下文参考，建议填写，不填可写 `""`） |
+| `bank_name` | 银行名称（作为 AI 解析账单时的上下文参考，建议填写，不填可写 `""`） |
+| `account_number` | 账号（AI 解析账单时的核心匹配依据，强烈建议填写）。中国内地银行一般以卡为单位出流水单，此处填写**卡号**；境外部分银行（如汇丰）以账户为单位出流水单，此处填写**账户号码**。请按照你实际流水单/银行账单上显示的信息填写 |
 | `default_currency` | 该账户的默认币种代码 |
 | `supported_currencies` | 该账户支持的币种代码列表 |
 
-### `config/currency.json` — 货币配置
+编辑 `data_users/alice/config/currency.json`，一般不需要修改，使用模版即可；需要支持更多货币需自行新增：
 
 ```json
 [
   {
     "currency_code": "01",
     "currency_iso": "CNY",
-    "alias": { "zh": "人民币", "en": "Chinese Yuan", "fr": "Yuan chinois" },
-    "currency_symbol": "￥"
-  },
-  {
-    "currency_code": "02",
-    "currency_iso": "HKD",
-    "alias": { "zh": "港币", "en": "Hong Kong Dollar", "fr": "Dollar hongkongais" },
-    "currency_symbol": "HK$"
+    "alias": {"zh": "人民币", "en": "RMB", "fr": "RMB"},
+    "currency_symbol": "¥"
   }
 ]
 ```
@@ -272,16 +176,124 @@ data_users/<user_id>/
 | :--- | :--- |
 | `currency_code` | 货币代码（两位数字字符串，全系统唯一） |
 | `currency_iso` | ISO 4217 三位字母代码（用于汇率获取） |
-| `alias` | 多语言显示别名 |
+| `alias` | 多语言显示别名，建议使用简短名称（如 "RMB"、"HKD"、"USD"），避免冗长的全称 |
 | `currency_symbol` | 货币符号（用于前端显示） |
+
+> 模板文件位于 `templates/` 目录，仅作为参考模板，不会被系统加载。系统只读取项目根目录的 `users.json` 和 `data_users/<user_id>/config/` 下的配置文件。
+
+### 方案二：新用户注册页面（不推荐）
+
+> 此方案仅适用于完全不熟悉命令行操作的用户。**推荐使用方案一**，更灵活且不易出错。
+
+如果跳过步骤 2 和步骤 3，直接启动服务后访问 Dashboard，系统会自动弹出 **Onboarding 引导页面**：
+
+1. **选择默认货币**：从预设列表中选择（如人民币、美元、港币等）
+2. **添加银行账户**：填写账户代码、银行名称、账号、持有人等
+3. **上传 PDF**（可选）：直接上传银行账单 PDF
+
+引导完成后，系统会自动创建 `config/accounts.json` 和 `config/currency.json`。
+
+> 注意：此方案仍需手动完成**步骤 1**（配置 `.env` 和 `users.json`），因为这两个文件是服务启动的前提。
+
+---
+
+## 部署指南
+
+### 方案一：Docker 部署（推荐）
+
+Docker 方案无需手动安装 Python 环境，一键构建部署，支持后台持久运行和自动重启。
+
+#### 1. 安装 Docker
+
+| 平台 | 安装方式 |
+| :--- | :--- |
+| **macOS** | 下载 [Docker Desktop for Mac](https://www.docker.com/products/docker-desktop/)，安装后启动 |
+| **Windows** | 下载 [Docker Desktop for Windows](https://www.docker.com/products/docker-desktop/)，安装后启动（需开启 WSL 2） |
+| **Linux** | 参考 [Docker 官方安装文档](https://docs.docker.com/engine/install/)，安装后运行 `sudo usermod -aG docker $USER` 并重新登录 |
+
+安装完成后验证：
+
+```bash
+docker --version
+docker compose version
+```
+
+#### 2. 配置文件
+
+按上方「配置指南」完成以下文件的配置：
+
+- `.env`（AI API 配置）
+- `users.json`（用户注册表）
+- `data_users/<user_id>/config/`（账户和货币配置，可选——首次使用时通过引导页创建）
+
+#### 3. 构建并启动
+
+```bash
+docker compose up -d --build
+```
+
+首次运行会下载 Python 基础镜像并安装依赖，耗时较长。构建完成后服务自动启动。
+
+访问 **`http://localhost:8000/`** ，选择用户身份进入 Dashboard。建议将此地址保存为浏览器书签，方便日后快速访问。
+
+#### 4. 常用命令
+
+| 操作 | 命令 |
+| :--- | :--- |
+| 查看日志 | `docker compose logs -f` |
+| 停止服务 | `docker compose down` |
+| 启动服务 | `docker compose up -d` |
+| 重启服务 | `docker compose restart` |
+| 更新后重新构建 | `docker compose up -d --build` |
+
+#### 5. 数据持久化
+
+容器通过挂载宿主机目录实现数据持久化：
+
+| 宿主机路径 | 容器路径 | 说明 |
+| :--- | :--- | :--- |
+| `./data_users` | `/app/data_users` | 用户数据（账单、配置、日志等） |
+| `./users.json` | `/app/users.json` | 用户注册表 |
+| `./.env` | `/app/.env` | AI API 配置（只读） |
+
+> 容器时区通过 `.env` 中的 `TIMEZONE` 变量控制，默认为 `Asia/Shanghai`。如需更改，编辑 `.env` 中的 `TIMEZONE` 值并重启容器（`docker compose restart`）。
+>
+> 容器配置了 `restart: unless-stopped` 策略：宿主机重启后容器会自动启动，运行中崩溃也会自动恢复。如需完全停止，使用 `docker compose down`。
+
+---
+
+### 方案二：Python 直接运行（调试用）
+
+此方案适合开发调试场景，需要手动管理 Python 环境。
+
+#### 1. 配置 Python 环境
+
+```bash
+# 创建 conda 环境（推荐）
+conda create -n fina-dashboard python=3.12 -y
+conda activate fina-dashboard
+
+# 安装依赖
+pip install -r requirements.txt
+```
+
+#### 2. 准备配置文件
+
+同 Docker 方案，按「配置指南」完成 `.env`、`users.json` 和用户数据目录的配置。
+
+#### 3. 启动服务
+
+```bash
+bash load.sh
+```
+
+服务启动后访问 **`http://localhost:8000/`** 。建议将此地址保存为浏览器书签，方便日后快速访问。按 `Ctrl+C` 停止服务。
 
 ---
 
 ## 后端运行逻辑
 
 ### 数据处理管线
-
-整个后端由三条管线串联而成：
 
 ```text
 PDF 银行账单
@@ -327,13 +339,35 @@ PDF 银行账单
 
 ---
 
+## 用户数据目录结构
+
+每个用户的数据目录按以下结构组织：
+
+```text
+data_users/<user_id>/
+├── config/                          # [手动] 配置文件
+│   ├── accounts.json                # 银行账户配置
+│   └── currency.json                # 货币配置
+├── database/                        # [自动生成] 核心数据
+│   ├── transactions.json            # 交易记录流水
+│   ├── parsed.json                  # 已解析文件记录
+│   └── fx_rate.json                 # 汇率矩阵
+├── ui/                              # [自动生成] 前端数据
+│   ├── ui_daily_series.json         # 每日时间序列
+│   ├── ui_static_charts.json        # 热力图 + 月度图
+│   ├── ui_transactions_and_categories.json  # 交易列表 + 分类
+│   └── ui_currency_breakdown.json   # 多币种余额明细
+├── raw_input/                       # [用户上传] 银行账单 PDF
+└── logs/                            # [自动生成] 运行日志
+```
+
+---
+
 ## 问题排查
 
 ### 解析失败
 
 **症状**：点击"Parse PDF"后显示错误，或通知中出现 `msg.parse_error`。
-
-**排查步骤**：
 
 1. 检查 `data_users/<user_id>/logs/parser.log` 中的详细错误信息
 2. 确认 `.env` 中的 AI API 配置正确（模型名、端点地址、密钥）
@@ -344,8 +378,6 @@ PDF 银行账单
 
 **症状**：通知中出现 `msg.fx_error`。
 
-**排查步骤**：
-
 1. 检查 `data_users/<user_id>/logs/fetch_fx.log`
 2. 确认网络可访问 `api.frankfurter.app`
 3. 确认 `config/currency.json` 中的 `currency_iso` 值为有效的 ISO 4217 代码
@@ -355,33 +387,20 @@ PDF 银行账单
 
 **症状**：上传 PDF 后页面数据未变化。
 
-**排查步骤**：
-
 1. 确认解析已完成：通知中应出现 `msg.parse_refresh_done`
 2. 刷新浏览器页面（Ctrl/Cmd + R）
 3. 如果问题持续，手动触发：前端 Settings → Refresh Data
 4. 检查 `data_users/<user_id>/ui/` 目录下是否有生成的 JSON 文件
 
-### 多用户数据隔离问题
-
-**症状**：用户 A 看到了用户 B 的数据。
-
-**排查步骤**：
-
-1. 检查 `users.json` 中每个用户的 `data_dir` 是否指向不同目录
-2. 检查 `data_users/` 下各用户目录是否独立
-3. 重启服务以清除可能的内存缓存
-
 ### 服务无法启动
 
-**症状**：运行 `bash load.sh` 后服务未启动。
+**症状**：运行 `bash load.sh` 或 `docker compose up` 后服务未启动。
 
-**排查步骤**：
-
-1. 确认环境已正确激活
-2. 确认依赖已安装：`pip list | grep -E "flask|anthropic|httpx|PyMuPDF"`
+1. 确认 `.env` 文件存在且格式正确
+2. 确认 `users.json` 文件存在且为合法 JSON 数组
 3. 确认端口 8000 未被占用：`lsof -i :8000`
-4. 检查 `users.json` 格式是否正确（合法 JSON 数组）
+4. Python 部署：确认依赖已安装（`pip list | grep -E "flask|anthropic|httpx|PyMuPDF"`）
+5. Docker 部署：查看容器日志（`docker compose logs`）
 
 ### 常见日志文件位置
 

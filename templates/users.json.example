@@ -1,0 +1,12 @@
+[
+  {
+    "id": "alice",
+    "name": "Alice",
+    "data_dir": "data_users/alice"
+  },
+  {
+    "id": "bob",
+    "name": "Bob",
+    "data_dir": "data_users/bob"
+  }
+]

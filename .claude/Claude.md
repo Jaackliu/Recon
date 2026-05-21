@@ -48,8 +48,6 @@ finance-dashboard/
 │       ├── database/        # 存放 parsed/transactions/fx_rate.json 等数据文件
 │       ├── ui/              # 存放前端显示相关 JSON 文件
 │       └── logs/
-├── scripts/
-│   └── migrate_to_multiuser.sh  # 数据迁移脚本
 ├── .gitignore
 └── .env
 
