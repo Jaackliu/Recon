@@ -295,15 +295,21 @@
   - 已安装 `apscheduler==3.11.2` 到 conda 环境。
 - 修改文件：`src/backend/api_server.py`
 
-## 2026-05-21 (PDF 解析失败详细通知)
+## 2026-05-21 (PDF 解析失败详细通知 + 重试机制)
 
-- **需求**：当 parser.py 中 PDF 解析失败时（包括所有 check_transaction 失败的情况），必须在 notification 中明确说明失败原因和失败文件。
-- **问题**：之前 parser.py 遇到解析失败的 PDF 时只在日志中记录，前端通知只显示最后一行 INFO 消息，用户无法得知哪些 PDF 失败以及失败原因。
+- **需求**：当 parser.py 中 PDF 解析失败时（包括所有 check_transaction 失败的情况），必须在 notification 中明确说明失败原因和失败文件。所有可重试的失败场景必须允许 3 次重试。
+- **问题**：之前 parser.py 遇到解析失败的 PDF 时只在日志中记录，前端通知只显示最后一行 INFO 消息，用户无法得知哪些 PDF 失败以及失败原因。且 `ai_parse_error`、`no_valid_transactions`、`multi_account` 三种失败无重试机制。
 - **修改内容**：
   - `parser.py`：
     - 新增 `failed_pdfs` 和 `success_pdfs` 跟踪列表
-    - 新增 `_record_failure()` 辅助函数，在每个失败点（render_error、ai_no_response、ai_parse_error、no_valid_transactions、multi_account）记录详细信息
-    - 余额校验失败的 PDF 在 `run_balance_check_and_reparse` 返回后通过比对 `parsed_entries` 哈希集合检测
+    - 新增 `_record_failure()` 辅助函数，在每个失败点记录详细信息
+    - main() 循环中，渲染 PDF 只做一次；AI 调用 + 校验部分加 `for attempt in range(1, MAX_RETRIES + 1)` 重试循环
+    - `ai_parse_error` / `no_valid_transactions` / `multi_account`：重试 3 次，每次重新调用 AI
+    - `render_error`：不重试（文件损坏）
+    - `ai_no_response`：不重试外层（`call_ai_grouped` 内部已有 3 次重试）
+    - `balance_check_failed`：已有 3 次重试（`run_balance_check_and_reparse`）
+    - 重试过程中若 AI 调用失败（`ai_no_response`），立即跳出重试循环
+    - 余额校验失败通过比对 `parsed_entries` 哈希集合检测
     - 每次运行结束写入 `parse_summary.json` 到 `data/database/`
     - 最终日志行包含成功/失败计数
   - `api_server.py`：
@@ -311,8 +317,15 @@
     - `_parse_watcher` 在 parser 成功后检查摘要：若有失败 PDF 则发送 `msg.parse_done_with_failures` 通知（包含成功数、新增交易数、失败数、失败文件名、失败原因详情）
     - 若无失败则仍发送原来的 `msg.parse_done`
   - `multi-lang.json`：新增 `msg.parse_done_with_failures` 翻译键（zh/en/fr）
-  - `docs/schema.md`：新增 `parse_summary.json` schema 文档，包含失败原因枚举说明
-- **失败原因枚举**：`render_error`、`ai_no_response`、`ai_parse_error`、`no_valid_transactions`、`multi_account`、`balance_check_failed`
+  - `app.js`：轮询逻辑增加对 `msg.parse_done_with_failures` 的处理，弹出警告 toast
+  - `docs/schema.md`：新增 `parse_summary.json` schema 文档，包含失败原因枚举及重试说明
+- **失败原因枚举与重试策略**：
+  - `render_error`：不重试
+  - `ai_no_response`：不重试外层（内部已有 3 次）
+  - `ai_parse_error`：重试 3 次
+  - `no_valid_transactions`：重试 3 次
+  - `multi_account`：重试 3 次
+  - `balance_check_failed`：重试 3 次（已有机制）
 
 ## 2026-05-21 (修复 Retro 深色按钮高亮)
 

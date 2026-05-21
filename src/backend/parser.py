@@ -767,6 +767,7 @@ def main() -> None:
 
     # Process each PDF
     for pdf_path, file_hash in unprocessed:
+        # Step 1: Render PDF to images (no retry — if the file is broken, retrying won't help)
         try:
             images = render_pdf_to_images(pdf_path)
             logger.info("Processing %s (%d pages, hash: %s...)", pdf_path.name, len(images), file_hash[:16])
@@ -774,25 +775,57 @@ def main() -> None:
             _record_failure(pdf_path.name, "render_error", str(exc)[:200])
             continue
 
+        # Step 2: Initial AI call (ai_no_response is NOT retried here —
+        # call_ai_grouped already retries 3 times internally)
         response_text = call_ai_grouped(client, system_prompt, images, logger, api_key, model, base_url)
         if not response_text:
             _record_failure(pdf_path.name, "ai_no_response", "AI API returned no response")
             continue
 
-        raw_txns = parse_ai_response(response_text)
-        if not raw_txns:
-            _record_failure(pdf_path.name, "ai_parse_error", "Failed to parse AI response as JSON")
+        # Step 3: Parse + validate with retry (ai_parse_error / no_valid_transactions / multi_account)
+        last_error = ("", "")
+        for attempt in range(1, MAX_RETRIES + 1):
+            raw_txns = parse_ai_response(response_text)
+            if not raw_txns:
+                last_error = ("ai_parse_error", "Failed to parse AI response as JSON")
+                logger.warning("Attempt %d/%d: %s for %s", attempt, MAX_RETRIES, last_error[0], pdf_path.name)
+                if attempt < MAX_RETRIES:
+                    response_text = call_ai_grouped(client, system_prompt, images, logger, api_key, model, base_url)
+                    if not response_text:
+                        last_error = ("ai_no_response", "AI API returned no response on retry")
+                        break
+                continue
+
+            raw_txns = validate_transactions(raw_txns, logger)
+            if not raw_txns:
+                last_error = ("no_valid_transactions", "No valid transactions after field validation")
+                logger.warning("Attempt %d/%d: %s for %s", attempt, MAX_RETRIES, last_error[0], pdf_path.name)
+                if attempt < MAX_RETRIES:
+                    response_text = call_ai_grouped(client, system_prompt, images, logger, api_key, model, base_url)
+                    if not response_text:
+                        last_error = ("ai_no_response", "AI API returned no response on retry")
+                        break
+                continue
+
+            if not validate_single_account(raw_txns, logger):
+                last_error = ("multi_account", "Multiple account codes found in single PDF")
+                logger.warning("Attempt %d/%d: %s for %s", attempt, MAX_RETRIES, last_error[0], pdf_path.name)
+                if attempt < MAX_RETRIES:
+                    response_text = call_ai_grouped(client, system_prompt, images, logger, api_key, model, base_url)
+                    if not response_text:
+                        last_error = ("ai_no_response", "AI API returned no response on retry")
+                        break
+                continue
+
+            # All checks passed
+            last_error = ("", "")
+            break
+
+        if last_error[0]:
+            _record_failure(pdf_path.name, last_error[0], last_error[1])
             continue
 
-        raw_txns = validate_transactions(raw_txns, logger)
-        if not raw_txns:
-            _record_failure(pdf_path.name, "no_valid_transactions", "No valid transactions after field validation")
-            continue
-
-        if not validate_single_account(raw_txns, logger):
-            _record_failure(pdf_path.name, "multi_account", "Multiple account codes found in single PDF")
-            continue
-
+        # Step 4: Normalize order, assign IDs, record success
         raw_txns = normalize_transaction_order(raw_txns, logger)
         account_code = str(raw_txns[0].get("account_code", "")).strip()
         new_txns = assign_transaction_ids(raw_txns, seq_map, file_hash, processed_at)
