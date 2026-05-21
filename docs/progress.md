@@ -318,6 +318,11 @@
     - 若无失败则仍发送原来的 `msg.parse_done`
   - `multi-lang.json`：新增 `msg.parse_done_with_failures` 翻译键（zh/en/fr）
   - `app.js`：轮询逻辑增加对 `msg.parse_done_with_failures` 的处理，弹出警告 toast
+
+## 2026-05-21 (Customize 日历动效优化)
+
+- 优化左侧时间选择自定义日历动效：打开面板时输入框与日历更柔和的入场动画，月份切换新增左右滑入效果，完成范围选择时起止日期增加轻微脉冲反馈。
+- 增强交互平滑度：日历卡片/日期单元过渡更细腻，保留 `prefers-reduced-motion` 降级支持。
   - `docs/schema.md`：新增 `parse_summary.json` schema 文档，包含失败原因枚举及重试说明
 - **失败原因枚举与重试策略**：
   - `render_error`：不重试
@@ -364,6 +369,30 @@
   - 添加 `prefers-color-scheme` 变化监听器，system 模式下自动响应系统主题切换。
   - CSS 深色模式选择器从 `@media (prefers-color-scheme: dark)` 改为 `[data-theme="dark"]`，与主应用一致。
 - 修改文件：`src/frontend/landing.html`
+
+## 2026-05-21 (自定义时间范围体验升级)
+
+- 侧边栏 Customize 改为内联展开双日历（上下排列），支持点击选择起止日期。
+- 自定义范围支持手动输入，输入格式与 Date Format 同步（显示/解析均一致）。
+- 移除旧的自定义范围弹窗，时间范围摘要与日历状态保持联动更新。
+- 修改文件：`src/frontend/index.html`、`src/frontend/app.js`、`src/frontend/styles.css`、`docs/frontend.md`
+
+## 2026-05-21 (日历导航按钮样式优化)
+
+- **需求**：将日历选择中的左右箭头改成横向小药丸样式（高度收窄），放置在两个日历的竖向中间位置，偏外侧，日历宽度保持不变。
+- **修改内容**：
+  - `styles.css`：修改 `.calendar-nav-btn` 样式，从 32x32 方形按钮改为 48x20 横向小药丸，添加 `border-radius: var(--radius-full)`、`border`、`background` 等样式，添加 hover 效果。
+  - `app.js`：修改 `renderRangeCalendars` 函数，在两个日历之间动态插入导航按钮，移除原来从 HTML 读取按钮的逻辑，改为动态创建按钮并更新 `dom.calendarPrev` 和 `dom.calendarNext` 引用。
+  - `index.html`：移除原来在 `.custom-range-panel` 中的 `.calendar-nav` 静态按钮。
+  - `docs/frontend.md`：更新时间范围调节器交互说明，描述新的日历导航按钮设计。
+- **效果**：日历导航按钮现在为横向小药丸样式，位于两个日历之间，偏外侧，日历宽度保持不变。
+
+## 2026-05-21 (自定义日历动效优化)
+
+- Customize 面板改为平滑展开收起，增加淡入与上移动效。
+- 日历卡片与导航按钮增加分层进入动效与阴影，选中日期提供轻量弹性反馈。
+- 日期输入框新增聚焦高亮，Customize 按钮在展开时显示激活状态。
+- 修改文件：`src/frontend/styles.css`、`src/frontend/app.js`
 
 ## Notes
 - Processor implementation complete; ready to run against sample data.

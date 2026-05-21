@@ -61,6 +61,19 @@
             </div>
             <button class="pill pill-wide" id="customRange" data-multi-lang="sidebar.customize">Customize</button>
             <div class="range-info" id="rangeInfo">--</div>
+            <div class="custom-range-panel" id="customRangePanel" aria-hidden="true">
+              <div class="custom-range-inputs">
+                <label class="field">
+                  <span data-multi-lang="modal.startDate">Start date</span>
+                  <input type="text" id="customStartInput" class="date-input" placeholder="YYYY-MM-DD" inputmode="numeric" />
+                </label>
+                <label class="field">
+                  <span data-multi-lang="modal.endDate">End date</span>
+                  <input type="text" id="customEndInput" class="date-input" placeholder="YYYY-MM-DD" inputmode="numeric" />
+                </label>
+              </div>
+              <div class="calendar-stack" id="calendarStack"></div>
+            </div>
           </div>
 
           <button class="settings-button" id="settingsButton" aria-label="Settings">
@@ -213,28 +226,6 @@
             <div class="transactions-list" id="transactionsList"></div>
           </section>
         </main>
-      </div>
-    </div>
-
-    <div class="modal" id="rangeModal" aria-hidden="true">
-      <div class="modal-card">
-        <div class="modal-header">
-          <h3 data-multi-lang="modal.customRange">Custom range</h3>
-          <button class="icon-button" id="closeRangeModal" aria-label="Close">x</button>
-        </div>
-        <div class="modal-body">
-          <label class="field">
-            <span data-multi-lang="modal.startDate">Start date</span>
-            <input type="date" id="rangeStart" />
-          </label>
-          <label class="field">
-            <span data-multi-lang="modal.endDate">End date</span>
-            <input type="date" id="rangeEnd" />
-          </label>
-        </div>
-        <div class="modal-actions">
-          <button class="pill" id="applyRange" data-multi-lang="modal.apply">Apply</button>
-        </div>
       </div>
     </div>
 

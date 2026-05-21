@@ -30,6 +30,13 @@ const state = {
     start: "",
     end: ""
   },
+  customRangeOpen: false,
+  rangeDraft: {
+    start: "",
+    end: "",
+    active: false
+  },
+  rangeAnchor: null,
   categoryType: "expense",
   transactionSort: "date",
   transactionFilters: {
@@ -88,12 +95,13 @@ const dom = {
   transactionFilters: document.getElementById("transactionFilters"),
   dashboardView: document.getElementById("dashboardView"),
   transactionsView: document.getElementById("transactionsView"),
-  rangeModal: document.getElementById("rangeModal"),
-  rangeStart: document.getElementById("rangeStart"),
-  rangeEnd: document.getElementById("rangeEnd"),
-  applyRange: document.getElementById("applyRange"),
-  closeRangeModal: document.getElementById("closeRangeModal"),
   customRange: document.getElementById("customRange"),
+  customRangePanel: document.getElementById("customRangePanel"),
+  customStartInput: document.getElementById("customStartInput"),
+  customEndInput: document.getElementById("customEndInput"),
+  calendarPrev: document.getElementById("calendarPrev"),
+  calendarNext: document.getElementById("calendarNext"),
+  calendarStack: document.getElementById("calendarStack"),
   detailModal: document.getElementById("detailModal"),
   detailTitle: document.getElementById("detailTitle"),
   detailSubtitle: document.getElementById("detailSubtitle"),
@@ -135,6 +143,24 @@ const dom = {
 };
 
 const palette = ["#ff385c", "#ff8b5a", "#f5c542", "#33b28a", "#2f80ed", "#222222", "#ff9aa7"];
+
+let calendarAnimTimer = null;
+
+function triggerCalendarAnimate(mode) {
+  if (!dom.customRangePanel) return;
+  dom.customRangePanel.classList.add("is-animate");
+  if (mode) {
+    dom.customRangePanel.setAttribute("data-calendar-motion", mode);
+  }
+  if (calendarAnimTimer) {
+    window.clearTimeout(calendarAnimTimer);
+  }
+  calendarAnimTimer = window.setTimeout(() => {
+    dom.customRangePanel.classList.remove("is-animate");
+    dom.customRangePanel.removeAttribute("data-calendar-motion");
+    calendarAnimTimer = null;
+  }, 520);
+}
 
 /* ---- multi-lang helpers ---- */
 
@@ -185,6 +211,84 @@ function formatDate(isoDate) {
     case "MM/DD/YYYY": return `${m}/${d}/${y}`;
     default: return `${y}-${m}-${d}`;
   }
+}
+
+function pad2(value) {
+  return String(value).padStart(2, "0");
+}
+
+function isValidDateParts(year, month, day) {
+  if (!year || !month || !day) return false;
+  if (month < 1 || month > 12) return false;
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return day >= 1 && day <= daysInMonth;
+}
+
+function parseDateInput(input) {
+  const value = String(input || "").trim();
+  if (!value) return "";
+  let year = 0;
+  let month = 0;
+  let day = 0;
+  if (state.dateFormat === "YYYY-MM-DD") {
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) return "";
+    year = Number(match[1]);
+    month = Number(match[2]);
+    day = Number(match[3]);
+  } else if (state.dateFormat === "YYYY/MM/DD") {
+    const match = value.match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
+    if (!match) return "";
+    year = Number(match[1]);
+    month = Number(match[2]);
+    day = Number(match[3]);
+  } else if (state.dateFormat === "DD/MM/YYYY") {
+    const match = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!match) return "";
+    day = Number(match[1]);
+    month = Number(match[2]);
+    year = Number(match[3]);
+  } else if (state.dateFormat === "MM/DD/YYYY") {
+    const match = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!match) return "";
+    month = Number(match[1]);
+    day = Number(match[2]);
+    year = Number(match[3]);
+  }
+  if (!isValidDateParts(year, month, day)) return "";
+  return `${year}-${pad2(month)}-${pad2(day)}`;
+}
+
+function parseIsoDate(isoDate) {
+  if (!isoDate) return null;
+  const [year, month, day] = isoDate.split("-").map(Number);
+  if (!isValidDateParts(year, month, day)) return null;
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+function toIsoDate(date) {
+  if (!date) return "";
+  return `${date.getUTCFullYear()}-${pad2(date.getUTCMonth() + 1)}-${pad2(date.getUTCDate())}`;
+}
+
+function getMonthIndexFromIso(isoDate) {
+  const parsed = parseIsoDate(isoDate);
+  if (!parsed) return 0;
+  return parsed.getUTCFullYear() * 12 + parsed.getUTCMonth();
+}
+
+function monthIndexToYearMonth(index) {
+  const year = Math.floor(index / 12);
+  const month = index % 12;
+  return { year, month };
+}
+
+function getMonthLabel(year, month) {
+  return `${year}-${pad2(month + 1)}`;
+}
+
+function getWeekdayLabels() {
+  return ["S", "M", "T", "W", "T", "F", "S"];
 }
 
 function setActiveDateFormatOption() {
@@ -737,6 +841,8 @@ document.addEventListener("click", (event) => {
     localStorage.setItem("dateFormat", format);
     setActiveDateFormatOption();
     updateAll();
+    syncCustomRangeInputs(true);
+    renderRangeCalendars();
     showToast(t("toast.dateFormatUpdated"));
   }
 });
@@ -1032,29 +1138,47 @@ function bindEvents() {
     state.rangeMode = button.dataset.range;
     updateAll();
     setActiveRangeButton();
+    closeCustomRangePanel();
   });
 
   dom.customRange.addEventListener("click", () => {
-    openRangeModal();
+    toggleCustomRangePanel();
   });
+  dom.customRange.setAttribute("aria-expanded", "false");
+  dom.customRange.setAttribute("aria-controls", "customRangePanel");
 
-  dom.applyRange.addEventListener("click", () => {
-    const start = dom.rangeStart.value;
-    const end = dom.rangeEnd.value;
-    if (!start || !end || start > end) {
-      showToast(t("toast.invalidDateRange"));
-      return;
-    }
-    setCustomRange(start, end);
-    closeRangeModal();
-  });
+  if (dom.customStartInput && dom.customEndInput) {
+    const onInputCommit = () => handleManualRangeInput(true);
+    const onInputChange = () => handleManualRangeInput(false);
+    dom.customStartInput.addEventListener("change", onInputChange);
+    dom.customEndInput.addEventListener("change", onInputChange);
+    dom.customStartInput.addEventListener("blur", onInputCommit);
+    dom.customEndInput.addEventListener("blur", onInputCommit);
+    dom.customStartInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") onInputCommit();
+    });
+    dom.customEndInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") onInputCommit();
+    });
+  }
 
-  dom.closeRangeModal.addEventListener("click", closeRangeModal);
-  dom.rangeModal.addEventListener("click", (event) => {
-    if (event.target === dom.rangeModal) {
-      closeRangeModal();
-    }
-  });
+  if (dom.calendarPrev) {
+    dom.calendarPrev.addEventListener("click", () => shiftCalendarAnchor(-1));
+  }
+
+  if (dom.calendarNext) {
+    dom.calendarNext.addEventListener("click", () => shiftCalendarAnchor(1));
+  }
+
+  if (dom.calendarStack) {
+    dom.calendarStack.addEventListener("click", (event) => {
+      const target = event.target.closest(".calendar-day");
+      if (!target || target.classList.contains("is-disabled")) return;
+      const date = target.dataset.date;
+      if (!date) return;
+      handleCalendarSelect(date);
+    });
+  }
 
   dom.detailSort.addEventListener("change", () => {
     state.detail.sort = dom.detailSort.value;
@@ -1231,6 +1355,9 @@ function setActiveRangeButton() {
     pill.classList.toggle("is-active", pill.dataset.range === state.rangeMode);
   });
   dom.customRange.classList.toggle("is-active", state.rangeMode === "custom");
+  if (state.rangeMode !== "custom") {
+    closeCustomRangePanel();
+  }
 }
 
 function setActiveCategoryToggle() {
@@ -1289,6 +1416,10 @@ function updateRangeSummary() {
   dom.rangeInfo.textContent = `${formatDate(range.startDate)} — ${formatDate(range.endDate)}`;
   dom.rangeSummary.textContent = `${formatDate(range.startDate)} - ${formatDate(range.endDate)}`;
   dom.lastUpdated.textContent = `${t("status.dataUpTo")} ${formatDate(range.endDate)}`;
+  syncCustomRangeInputs();
+  if (state.customRangeOpen) {
+    renderRangeCalendars();
+  }
 }
 
 function updateDashboard() {
@@ -1889,8 +2020,12 @@ function setCustomRange(startDate, endDate) {
   state.customRange.start = finalStart;
   state.customRange.end = finalEnd;
   state.rangeMode = "custom";
+  state.rangeDraft.start = finalStart;
+  state.rangeDraft.end = finalEnd;
+  state.rangeDraft.active = false;
   setActiveRangeButton();
   updateAll();
+  syncCustomRangeInputs(true);
 }
 
 function openDayDetail(date) {
@@ -2369,19 +2504,298 @@ function revealCards() {
   });
 }
 
-function openRangeModal() {
-  dom.rangeModal.classList.add("is-open");
-  dom.rangeModal.setAttribute("aria-hidden", "false");
-  const series = getSeriesForAccount(state.account);
-  if (series && series.length > 0) {
-    dom.rangeStart.value = state.customRange.start || series[0].date;
-    dom.rangeEnd.value = state.customRange.end || series[series.length - 1].date;
+function toggleCustomRangePanel() {
+  if (state.customRangeOpen) {
+    closeCustomRangePanel();
+  } else {
+    openCustomRangePanel();
   }
 }
 
-function closeRangeModal() {
-  dom.rangeModal.classList.remove("is-open");
-  dom.rangeModal.setAttribute("aria-hidden", "true");
+function openCustomRangePanel() {
+  if (!dom.customRangePanel) return;
+  state.customRangeOpen = true;
+  dom.customRangePanel.classList.add("is-open");
+  dom.customRangePanel.setAttribute("aria-hidden", "false");
+  if (dom.customRange) {
+    dom.customRange.classList.add("is-open");
+    dom.customRange.setAttribute("aria-expanded", "true");
+  }
+  triggerCalendarAnimate("open");
+  syncRangeDraftFromCurrent();
+  syncCustomRangeInputs(true);
+  ensureCalendarAnchor();
+  renderRangeCalendars();
+}
+
+function closeCustomRangePanel() {
+  if (!dom.customRangePanel) return;
+  state.customRangeOpen = false;
+  dom.customRangePanel.classList.remove("is-open");
+  dom.customRangePanel.classList.remove("is-animate");
+  dom.customRangePanel.removeAttribute("data-calendar-motion");
+  dom.customRangePanel.setAttribute("aria-hidden", "true");
+  if (dom.customRange) {
+    dom.customRange.classList.remove("is-open");
+    dom.customRange.setAttribute("aria-expanded", "false");
+  }
+  if (calendarAnimTimer) {
+    window.clearTimeout(calendarAnimTimer);
+    calendarAnimTimer = null;
+  }
+  state.rangeDraft.active = false;
+}
+
+function syncRangeDraftFromCurrent() {
+  const series = getSeriesForAccount(state.account);
+  if (!series || series.length === 0) return;
+  const range = getRange(series);
+  state.rangeDraft.start = range.startDate;
+  state.rangeDraft.end = range.endDate;
+  state.rangeDraft.active = false;
+}
+
+function syncCustomRangeInputs(force) {
+  if (!dom.customStartInput || !dom.customEndInput) return;
+  const series = getSeriesForAccount(state.account);
+  if (!series || series.length === 0) return;
+  const range = getRange(series);
+  const startValue = formatDate(range.startDate);
+  const endValue = formatDate(range.endDate);
+  const active = document.activeElement;
+  if (force || active !== dom.customStartInput) {
+    dom.customStartInput.value = startValue;
+  }
+  if (force || active !== dom.customEndInput) {
+    dom.customEndInput.value = endValue;
+  }
+  dom.customStartInput.placeholder = state.dateFormat;
+  dom.customEndInput.placeholder = state.dateFormat;
+  if (force) {
+    setInputValidity(dom.customStartInput, true);
+    setInputValidity(dom.customEndInput, true);
+  }
+}
+
+function setInputValidity(input, isValid) {
+  if (!input) return;
+  input.classList.toggle("is-invalid", !isValid);
+}
+
+function handleManualRangeInput(isCommit) {
+  if (!dom.customStartInput || !dom.customEndInput) return;
+  const startRaw = dom.customStartInput.value;
+  const endRaw = dom.customEndInput.value;
+  const startIso = parseDateInput(startRaw);
+  const endIso = parseDateInput(endRaw);
+
+  setInputValidity(dom.customStartInput, !startRaw || !!startIso);
+  setInputValidity(dom.customEndInput, !endRaw || !!endIso);
+
+  if (!startIso || !endIso) {
+    if (isCommit && (startRaw || endRaw)) {
+      showToast(t("toast.invalidDateRange"));
+    }
+    return;
+  }
+
+  if (startIso > endIso) {
+    setInputValidity(dom.customStartInput, false);
+    setInputValidity(dom.customEndInput, false);
+    if (isCommit) {
+      showToast(t("toast.invalidDateRange"));
+    }
+    return;
+  }
+
+  setCustomRange(startIso, endIso);
+}
+
+function ensureCalendarAnchor() {
+  const series = getSeriesForAccount(state.account);
+  if (!series || series.length === 0) return;
+  const minIndex = getMonthIndexFromIso(series[0].date);
+  const maxIndex = getMonthIndexFromIso(series[series.length - 1].date);
+  const maxAnchor = maxIndex > minIndex ? maxIndex - 1 : maxIndex;
+  let anchor = state.rangeAnchor;
+  if (anchor === null || anchor < minIndex || anchor > maxAnchor) {
+    const endDate = state.rangeDraft.end || getRange(series).endDate;
+    const endIndex = getMonthIndexFromIso(endDate);
+    anchor = endIndex - 1;
+    if (anchor < minIndex) anchor = minIndex;
+    if (anchor > maxAnchor) anchor = maxAnchor;
+  }
+  state.rangeAnchor = anchor;
+  updateCalendarNavState(minIndex, maxAnchor);
+}
+
+function updateCalendarNavState(minIndex, maxAnchor) {
+  if (!dom.calendarPrev || !dom.calendarNext) return;
+  dom.calendarPrev.disabled = state.rangeAnchor <= minIndex;
+  dom.calendarNext.disabled = state.rangeAnchor >= maxAnchor;
+}
+
+function shiftCalendarAnchor(delta) {
+  const series = getSeriesForAccount(state.account);
+  if (!series || series.length === 0) return;
+  const minIndex = getMonthIndexFromIso(series[0].date);
+  const maxIndex = getMonthIndexFromIso(series[series.length - 1].date);
+  const maxAnchor = maxIndex > minIndex ? maxIndex - 1 : maxIndex;
+  let next = (state.rangeAnchor ?? minIndex) + delta;
+  if (next < minIndex) next = minIndex;
+  if (next > maxAnchor) next = maxAnchor;
+  state.rangeAnchor = next;
+  updateCalendarNavState(minIndex, maxAnchor);
+  triggerCalendarAnimate(delta > 0 ? "next" : "prev");
+  renderRangeCalendars();
+}
+
+function getCalendarSelectionRange(series) {
+  if (state.rangeDraft.active) {
+    const start = state.rangeDraft.start;
+    const end = state.rangeDraft.end || state.rangeDraft.start;
+    if (start && end && start <= end) {
+      return { start, end };
+    }
+    return { start: start || "", end: start || "" };
+  }
+  const range = getRange(series);
+  return { start: range.startDate, end: range.endDate };
+}
+
+function renderRangeCalendars() {
+  if (!dom.calendarStack) return;
+  const series = getSeriesForAccount(state.account);
+  if (!series || series.length === 0) {
+    dom.calendarStack.innerHTML = "";
+    return;
+  }
+  ensureCalendarAnchor();
+  const minDate = series[0].date;
+  const maxDate = series[series.length - 1].date;
+  const maxIndex = getMonthIndexFromIso(maxDate);
+  const anchorIndex = state.rangeAnchor ?? maxIndex;
+  const secondIndex = Math.min(anchorIndex + 1, maxIndex);
+  const selection = getCalendarSelectionRange(series);
+
+  dom.calendarStack.innerHTML = "";
+  const indices = [anchorIndex, secondIndex];
+  indices.forEach((index, i) => {
+    const { year, month } = monthIndexToYearMonth(index);
+    const calendar = buildCalendarMonth(year, month, minDate, maxDate, selection);
+    dom.calendarStack.appendChild(calendar);
+
+    // Insert navigation buttons between the two calendars
+    if (i === 0) {
+      const nav = document.createElement("div");
+      nav.className = "calendar-nav";
+
+      const prevBtn = document.createElement("button");
+      prevBtn.type = "button";
+      prevBtn.className = "icon-button calendar-nav-btn";
+      prevBtn.id = "calendarPrev";
+      prevBtn.setAttribute("aria-label", "Previous month");
+      prevBtn.textContent = "<";
+      prevBtn.disabled = dom.calendarPrev ? dom.calendarPrev.disabled : state.rangeAnchor <= getMonthIndexFromIso(minDate);
+      prevBtn.addEventListener("click", () => shiftCalendarAnchor(-1));
+
+      const nextBtn = document.createElement("button");
+      nextBtn.type = "button";
+      nextBtn.className = "icon-button calendar-nav-btn";
+      nextBtn.id = "calendarNext";
+      nextBtn.setAttribute("aria-label", "Next month");
+      nextBtn.textContent = ">";
+      nextBtn.disabled = dom.calendarNext ? dom.calendarNext.disabled : state.rangeAnchor >= maxIndex - 1;
+      nextBtn.addEventListener("click", () => shiftCalendarAnchor(1));
+
+      nav.appendChild(prevBtn);
+      nav.appendChild(nextBtn);
+      dom.calendarStack.appendChild(nav);
+
+      // Update dom references to the new buttons
+      dom.calendarPrev = prevBtn;
+      dom.calendarNext = nextBtn;
+    }
+  });
+}
+
+function buildCalendarMonth(year, month, minDate, maxDate, selection) {
+  const calendar = document.createElement("div");
+  calendar.className = "calendar";
+
+  const header = document.createElement("div");
+  header.className = "calendar-header";
+  header.textContent = getMonthLabel(year, month);
+  calendar.appendChild(header);
+
+  const weekdays = document.createElement("div");
+  weekdays.className = "calendar-weekdays";
+  getWeekdayLabels().forEach((label) => {
+    const cell = document.createElement("span");
+    cell.textContent = label;
+    weekdays.appendChild(cell);
+  });
+  calendar.appendChild(weekdays);
+
+  const grid = document.createElement("div");
+  grid.className = "calendar-grid";
+  const firstDay = new Date(Date.UTC(year, month, 1));
+  const offset = firstDay.getUTCDay();
+
+  for (let i = 0; i < 42; i += 1) {
+    const cellDate = new Date(Date.UTC(year, month, 1 - offset + i));
+    const iso = toIsoDate(cellDate);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "calendar-day";
+    button.dataset.date = iso;
+    button.textContent = String(cellDate.getUTCDate());
+
+    const isOtherMonth = cellDate.getUTCMonth() !== month;
+    const isDisabled = iso < minDate || iso > maxDate;
+    if (isOtherMonth) button.classList.add("is-other");
+    if (isDisabled) button.classList.add("is-disabled");
+
+    if (selection.start && selection.end && iso >= selection.start && iso <= selection.end) {
+      button.classList.add("is-in-range");
+    }
+    if (selection.start && iso === selection.start) {
+      button.classList.add("is-start");
+    }
+    if (selection.end && iso === selection.end) {
+      button.classList.add("is-end");
+    }
+
+    grid.appendChild(button);
+  }
+
+  calendar.appendChild(grid);
+  return calendar;
+}
+
+function handleCalendarSelect(date) {
+  if (!state.rangeDraft.active) {
+    state.rangeDraft.start = date;
+    state.rangeDraft.end = "";
+    state.rangeDraft.active = true;
+    syncInputsFromDraft();
+    renderRangeCalendars();
+    return;
+  }
+  state.rangeDraft.end = date;
+  state.rangeDraft.active = false;
+  setCustomRange(state.rangeDraft.start, state.rangeDraft.end || state.rangeDraft.start);
+  renderRangeCalendars();
+  triggerCalendarAnimate("select");
+}
+
+function syncInputsFromDraft() {
+  if (!dom.customStartInput || !dom.customEndInput) return;
+  if (!state.rangeDraft.start) return;
+  dom.customStartInput.value = formatDate(state.rangeDraft.start);
+  dom.customEndInput.value = state.rangeDraft.end ? formatDate(state.rangeDraft.end) : "";
+  setInputValidity(dom.customStartInput, true);
+  setInputValidity(dom.customEndInput, true);
 }
 
 function showToast(message, isError) {
