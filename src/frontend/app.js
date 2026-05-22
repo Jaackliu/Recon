@@ -139,7 +139,10 @@ const dom = {
   closeEditConfigModal: document.getElementById("closeEditConfigModal"),
   saveEditConfig: document.getElementById("saveEditConfig"),
   cancelEditConfig: document.getElementById("cancelEditConfig"),
-  deleteConfigBtn: document.getElementById("deleteConfigBtn")
+  deleteConfigBtn: document.getElementById("deleteConfigBtn"),
+  abortOverlay: document.getElementById("abortOverlay"),
+  abortCancel: document.getElementById("abortCancel"),
+  abortConfirm: document.getElementById("abortConfirm")
 };
 
 const palette = ["#ff385c", "#ff8b5a", "#f5c542", "#33b28a", "#2f80ed", "#222222", "#ff9aa7"];
@@ -422,8 +425,30 @@ async function handleParsePdf() {
   }
 }
 
+async function handleAbortParse() {
+  closeAbortConfirmModal();
+  try {
+    const res = await fetch(`/${USER_ID}/api/parse/abort`, { method: "POST" });
+    if (!res.ok) throw new Error();
+    showToast(t("toast.parseAborted"));
+    setParseLoading(false);
+  } catch {
+    showToast(t("toast.abortParseFailed"), true);
+  }
+}
+
+function showAbortConfirmModal() {
+  dom.abortOverlay.style.display = "";
+  dom.abortOverlay.setAttribute("aria-hidden", "false");
+}
+
+function closeAbortConfirmModal() {
+  dom.abortOverlay.style.display = "none";
+  dom.abortOverlay.setAttribute("aria-hidden", "true");
+  dom.parsePdfBtn.classList.remove("is-aborting");
+}
+
 function setParseLoading(loading) {
-  dom.parsePdfBtn.disabled = loading;
   dom.parsePdfBtn.classList.toggle("is-loading", loading);
 }
 
@@ -440,9 +465,11 @@ function pollParseStatus() {
         fetchMessages().then((msgs) => {
           if (!msgs.length) return;
           const latest = msgs[0];
-          if (latest.key === "msg.parse_error") {
+          if (latest.key === "msg.parse_aborted") {
+            showToast(formatNotification(latest.key, latest.params));
+          } else if (latest.key === "msg.parse_error") {
             showToast(formatNotification(latest.key, latest.params), true);
-          } else if (latest.key === "msg.refresh_done") {
+          } else if (latest.key === "msg.manual_refresh") {
             // Full pipeline complete: parse + refresh → reload page
             // Check if there were parse failures before showing success toast
             const failureMsg = msgs.find((m) => m.key === "msg.parse_done_with_failures");
@@ -1336,8 +1363,58 @@ function bindEvents() {
       dom.fileInput.click();
     }
   });
+
+  // Parse button long press → abort parsing
+  let parseLongPressTimer = null;
+  let parseLongPressTriggered = false;
+
+  function clearParseLongPress() {
+    if (parseLongPressTimer) {
+      clearTimeout(parseLongPressTimer);
+      parseLongPressTimer = null;
+    }
+    dom.parsePdfBtn.classList.remove("is-aborting");
+  }
+
+  function handleParseLongPress() {
+    parseLongPressTriggered = true;
+    dom.parsePdfBtn.classList.add("is-aborting");
+    showAbortConfirmModal();
+  }
+
+  dom.parsePdfBtn.addEventListener("mousedown", (event) => {
+    if (!dom.parsePdfBtn.classList.contains("is-loading")) return;
+    parseLongPressTriggered = false;
+    clearParseLongPress();
+    parseLongPressTimer = setTimeout(handleParseLongPress, 600);
+  });
+
+  dom.parsePdfBtn.addEventListener("mouseup", clearParseLongPress);
+  dom.parsePdfBtn.addEventListener("mouseleave", clearParseLongPress);
+
+  dom.parsePdfBtn.addEventListener("touchstart", (event) => {
+    if (!dom.parsePdfBtn.classList.contains("is-loading")) return;
+    parseLongPressTriggered = false;
+    clearParseLongPress();
+    parseLongPressTimer = setTimeout(handleParseLongPress, 600);
+  }, { passive: true });
+
+  dom.parsePdfBtn.addEventListener("touchend", clearParseLongPress);
+  dom.parsePdfBtn.addEventListener("touchcancel", clearParseLongPress);
   dom.fileInput.addEventListener("change", handleFileUpload);
-  dom.parsePdfBtn.addEventListener("click", handleParsePdf);
+
+  dom.parsePdfBtn.addEventListener("click", (event) => {
+    if (parseLongPressTriggered) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      return;
+    }
+    if (dom.parsePdfBtn.classList.contains("is-loading")) {
+      showToast(t("toast.parseAlreadyRunning"));
+      return;
+    }
+    handleParsePdf();
+  });
   dom.refreshDataBtn.addEventListener("click", handleRefreshData);
 
   dom.notificationButton.addEventListener("click", openNotificationModal);
@@ -1385,6 +1462,13 @@ function bindEvents() {
 
   bindTxTooltipEvents(dom.transactionsList);
   bindTxTooltipEvents(dom.detailList);
+
+  // Abort parse confirmation dialog
+  dom.abortCancel.addEventListener("click", closeAbortConfirmModal);
+  dom.abortConfirm.addEventListener("click", handleAbortParse);
+  dom.abortOverlay.addEventListener("click", (event) => {
+    if (event.target === dom.abortOverlay) closeAbortConfirmModal();
+  });
 
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
     if (state.theme === "system") {

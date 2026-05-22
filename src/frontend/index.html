@@ -470,6 +470,17 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+    <!-- Abort parse confirmation overlay -->
+    <div class="abort-overlay" id="abortOverlay" aria-hidden="true" style="display:none">
+      <div class="abort-dialog">
+        <p data-multi-lang="modal.abortParseConfirm">Are you sure you want to abort the parsing?</p>
+        <div class="abort-actions">
+          <button class="pill" id="abortCancel" data-multi-lang="modal.cancel">Cancel</button>
+          <button class="pill pill-danger" id="abortConfirm" data-multi-lang="modal.confirmAbort">Abort</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Onboarding overlay for new users -->
     <div class="onboarding-overlay" id="onboardingOverlay" style="display:none">
       <div class="onboarding-card">

@@ -99,6 +99,8 @@ def _run_script(script: str, user_id: str) -> tuple[bool, str]:
 # Background parse watcher with status tracking
 # ---------------------------------------------------------------------------
 _parse_status: dict[str, dict] = {}
+_parse_processes: dict[str, subprocess.Popen] = {}
+_aborted_parses: set[str] = set()
 _parse_lock = threading.Lock()
 
 
@@ -119,8 +121,52 @@ def _read_parse_summary(user_id: str) -> dict | None:
 def _parse_watcher(user_id: str):
     """Run parser.py; on success, auto-run fetch_fx + processor."""
     ok = False
+    data_dir = user_data_dir(user_id)
+    if not data_dir:
+        with _parse_lock:
+            _parse_status[user_id] = {"running": False, "ok": False}
+        return
+
+    env = {**os.environ, "FINANCE_DATA_DIR": str(data_dir)}
+
     try:
-        ok, info = _run_script("parser.py", user_id)
+        was_aborted = False
+
+        proc = subprocess.Popen(
+            [PYTHON, str(BACKEND_DIR / "parser.py")],
+            cwd=str(BACKEND_DIR),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=env,
+        )
+        with _parse_lock:
+            _parse_processes[user_id] = proc
+            if user_id in _aborted_parses:
+                was_aborted = True
+                proc.terminate()
+
+        stdout, stderr = proc.communicate()
+        returncode = proc.returncode
+
+        if returncode != 0:
+            with _parse_lock:
+                if user_id in _aborted_parses:
+                    was_aborted = True
+                    _aborted_parses.discard(user_id)
+            if was_aborted:
+                # Process was aborted by user — abort endpoint already
+                # sent msg.parse_aborted; skip all further notifications.
+                return
+            else:
+                err = stderr.strip()[-300:] if stderr else "unknown error"
+                ok = False
+                info = err
+        else:
+            ok = True
+            combined = (stdout or "") + (stderr or "")
+            info = _extract_info(combined)
+
         if ok:
             summary = _read_parse_summary(user_id)
             if summary and summary.get("failed_pdfs"):
@@ -150,6 +196,7 @@ def _parse_watcher(user_id: str):
     finally:
         with _parse_lock:
             _parse_status[user_id] = {"running": False, "ok": ok}
+            _parse_processes.pop(user_id, None)
 
 
 # ---------------------------------------------------------------------------
@@ -349,6 +396,35 @@ def parse_status(user_id):
     with _parse_lock:
         status = _parse_status.get(user_id, {"running": False})
     return jsonify(status)
+
+
+@app.route("/<user_id>/api/parse/abort", methods=["POST"])
+def abort_parse(user_id):
+    """Abort a running parser process for the user."""
+    if not get_user(user_id):
+        abort(404)
+    with _parse_lock:
+        proc = _parse_processes.get(user_id)
+        if not proc and not _parse_status.get(user_id, {}).get("running"):
+            return jsonify({"status": "not_running"}), 404
+
+        if proc:
+            try:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait()
+            except Exception:
+                pass
+
+        _parse_status[user_id] = {"running": False, "ok": False}
+        _parse_processes.pop(user_id, None)
+        _aborted_parses.add(user_id)
+
+    _add_message(user_id, "msg.parse_aborted", {})
+    return jsonify({"status": "aborted"})
 
 
 @app.route("/<user_id>/api/refresh", methods=["POST"])

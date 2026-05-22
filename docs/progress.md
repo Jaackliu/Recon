@@ -464,6 +464,41 @@
   - 标记文件存在时，`_check_fx_stale()` 返回 `stale: false`，阻止重复自动刷新
   - 用户手动刷新时删除标记文件，恢复自动刷新能力
 
+## 2026-05-22 (长按中止解析功能)
+
+- **需求**：解析 PDF 正在运行时，允许长按"解析 PDF"按钮（依旧不允许重复单击），按钮逐渐变红弹出确认窗口，确认后中止所有解析进程，发消息提醒用户。
+- **后端修改** (`src/backend/api_server.py`)：
+  - 新增 `_parse_processes` 字典：跟踪正在运行的 parser 子进程（`subprocess.Popen`）
+  - `_parse_watcher` 函数改为使用 `Popen` 替代 `_run_script`，存储进程引用供后续中止
+  - 新增 `POST /<user_id>/api/parse/abort` API 端点：
+    - 向 parser 子进程发送 `SIGTERM`，5 秒内未退出则强制 `SIGKILL`
+    - 清理 `_parse_status` 和 `_parse_processes` 状态
+    - 写入 `msg.parse_aborted` 通知消息
+- **前端修改** (`src/frontend/app.js`)：
+  - `setParseLoading` 函数：移除 `disabled` 设置，仅保留 `.is-loading` 视觉状态，确保按钮始终可接收长按事件
+  - Parse 按钮点击逻辑修改：解析中单击显示"解析正在进行中"提示，长按 600ms 后触发中止流程
+  - 长按检测：mousedown/touchstart 启动 600ms 计时器（仅 `.is-loading` 状态时生效），触发后按钮添加 `.is-aborting` 类
+  - 新增 `showAbortConfirmModal()` / `closeAbortConfirmModal()` / `handleAbortParse()` 函数
+  - 新增 `dom.abortOverlay`、`dom.abortCancel`、`dom.abortConfirm` DOM 引用
+- **HTML 修改** (`src/frontend/index.html`)：
+  - 新增中止确认弹窗（`#abortOverlay`），包含确认文本、取消和中止按钮
+- **样式修改** (`src/frontend/styles.css`)：
+  - `.data-action-btn.is-loading`：移除 `pointer-events: none`，允许接收长按事件
+  - 新增 `.data-action-btn.is-aborting`：红色背景（#dc3545）+ 白色文字，0.6s 渐变动效
+  - 新增 `.abort-overlay`、`.abort-dialog`、`.abort-actions` 样式
+  - 新增 `.pill-danger` 样式（红色危险按钮）
+- **多语言** (`src/frontend/multi-lang.json`)：
+  - 新增 `modal.confirmAbort`（zh: 中止解析, en: Abort parsing, fr: Interrompre l'analyse）
+  - 新增 `modal.abortParseConfirm`（确认提示文本）
+  - 新增 `toast.parseAborted`（zh: 解析已中止, en: Parsing aborted, fr: Analyse interrompue）
+  - 新增 `toast.abortParseFailed`（中止失败提示）
+  - 新增 `msg.parse_aborted`（通知消息：解析已被用户手动中止）
+- **文档更新**：
+  - `docs/schema.md`：新增"解析中止 API"章节，描述 abort 端点行为与状态清理
+  - `docs/frontend.md`：更新"解析 PDF"按钮描述，添加长按中止行为说明
+  - `docs/process.md`：更新处理管线说明，添加中止机制注释
+  - `README.md`：交互功能列表和解析管线章节添加中止功能说明
+
 ## Notes
 - Processor implementation complete; ready to run against sample data.
 - Parser implementation complete; processes PDFs via multimodal AI API.

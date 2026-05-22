@@ -11,6 +11,8 @@
 
 `processor.py` 在每次 `parser.py` 更新 `transactions.json` 后自动运行（通过 Parse PDF 按钮触发，后端依次执行 `fetch_fx.py` → `processor.py`），执行以下四个核心阶段：
 
+> **解析中止**：用户可长按"解析 PDF"按钮（600ms）中止正在运行的 `parser.py` 进程。后端通过 `POST /<user_id>/api/parse/abort` 端点发送 `SIGTERM` 信号终止子进程，5 秒内未退出则强制 `SIGKILL`。
+
 ### 0. 币种语义与汇率转换 (Multi-Currency Context)
 为了支持前端货币选择器，处理引擎必须提供两类数据视角：
 *   **默认币种视角 (Converted)**：

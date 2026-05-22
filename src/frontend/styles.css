@@ -2407,8 +2407,14 @@ input {
 /* Parse button loading state */
 .data-action-btn.is-loading {
   opacity: 0.6;
-  pointer-events: none;
   position: relative;
+}
+
+.data-action-btn.is-aborting {
+  background: #dc3545 !important;
+  border-color: #dc3545 !important;
+  color: #ffffff !important;
+  transition: background 0.6s ease, border-color 0.6s ease, color 0.6s ease;
 }
 
 .data-action-btn.is-loading::after {
@@ -2477,6 +2483,56 @@ input {
 .toast.toast-error {
   background: #d32f2f;
   color: #fff;
+}
+
+/* Abort parse confirmation overlay */
+.abort-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--scrim);
+  backdrop-filter: blur(2px);
+}
+
+.abort-dialog {
+  background: var(--canvas);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  max-width: 340px;
+  width: calc(100% - 32px);
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+
+.abort-dialog p {
+  margin: 0 0 var(--space-base);
+  font-size: 14px;
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+.abort-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.pill-danger {
+  background: #dc3545 !important;
+  color: #ffffff !important;
+  border-color: #dc3545 !important;
+}
+
+.pill-danger:hover {
+  background: #c82333 !important;
+  border-color: #bd2130 !important;
+}
+
+.pill-danger:active {
+  background: #bd2130 !important;
 }
 
 .config-empty {
