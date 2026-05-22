@@ -9,7 +9,6 @@ import threading
 from datetime import datetime
 from pathlib import Path
 
-from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask, jsonify, request, send_from_directory, abort
 from flask_cors import CORS
 
@@ -159,6 +158,9 @@ def _parse_watcher(user_id: str):
 
 def _do_refresh(user_id: str, auto: bool = False):
     """Run fetch_fx.py + processor.py, record messages."""
+    data_dir = user_data_dir(user_id)
+    failed_path = data_dir / "logs" / "fx_auto_refresh_failed" if data_dir else None
+
     ok, info = _run_script("fetch_fx.py", user_id)
     if not ok:
         _add_message(user_id, "msg.fx_error", {"error": info})
@@ -171,30 +173,85 @@ def _do_refresh(user_id: str, auto: bool = False):
         _add_message(user_id, "msg.processor_error", {"error": info})
         return False
 
+    # Manual refresh clears the auto-refresh failure marker
+    if not auto and failed_path and failed_path.exists():
+        failed_path.unlink()
+
     if auto:
         _add_message(user_id, "msg.auto_refresh", {"fx_detail": fx_detail})
     else:
-        _add_message(user_id, "msg.refresh_done", {"fx_detail": fx_detail})
+        _add_message(user_id, "msg.manual_refresh", {"fx_detail": fx_detail})
     return True
 
 
 # ---------------------------------------------------------------------------
-# Per-user daily 4:00 AM scheduler (APScheduler)
+# FX auto-refresh logic (24-hour threshold)
 # ---------------------------------------------------------------------------
 
-def _start_scheduler():
-    scheduler = BackgroundScheduler(timezone=os.environ.get("TIMEZONE", "Asia/Shanghai"))
-    for user in load_users():
-        scheduler.add_job(
-            _do_refresh,
-            "cron",
-            hour=4, minute=0,
-            args=[user["id"], True],
-            id=f"daily_refresh_{user['id']}",
-            replace_existing=True,
-            misfire_grace_time=3600,
-        )
-    scheduler.start()
+def _check_fx_stale(user_id: str) -> dict:
+    """Check if FX rates are stale (>24h since last update)."""
+    data_dir = user_data_dir(user_id)
+    if not data_dir:
+        return {"stale": False, "error": "Unknown user"}
+
+    fx_path = data_dir / "database" / "fx_rate.json"
+    failed_path = data_dir / "logs" / "fx_auto_refresh_failed"
+
+    # If previous auto-refresh failed, don't retry until manual refresh
+    if failed_path.exists():
+        return {"stale": False, "auto_refresh_failed": True}
+
+    if not fx_path.exists():
+        return {"stale": True, "reason": "no_fx_file"}
+
+    try:
+        fx_data = json.loads(fx_path.read_text(encoding="utf-8"))
+        updated_at = fx_data.get("updated_at", "")
+        if not updated_at:
+            return {"stale": True, "reason": "no_updated_at"}
+
+        last_update = datetime.fromisoformat(updated_at)
+        now = datetime.now()
+        hours_since = (now - last_update).total_seconds() / 3600
+
+        if hours_since > 24:
+            return {"stale": True, "reason": "older_than_24h", "hours_since": round(hours_since, 1)}
+        return {"stale": False}
+    except (json.JSONDecodeError, ValueError, OSError) as e:
+        return {"stale": True, "reason": "parse_error", "error": str(e)}
+
+
+def _do_auto_refresh(user_id: str) -> bool:
+    """Attempt auto-refresh. Returns True on success, False on failure."""
+    data_dir = user_data_dir(user_id)
+    if not data_dir:
+        return False
+
+    failed_path = data_dir / "logs" / "fx_auto_refresh_failed"
+
+    ok, info = _run_script("fetch_fx.py", user_id)
+    if not ok:
+        _add_message(user_id, "msg.auto_fx_error", {"error": info})
+        # Mark auto-refresh as failed
+        failed_path.parent.mkdir(parents=True, exist_ok=True)
+        failed_path.write_text(datetime.now().isoformat(), encoding="utf-8")
+        return False
+
+    fx_detail = info
+
+    ok, info = _run_script("processor.py", user_id)
+    if not ok:
+        _add_message(user_id, "msg.processor_error", {"error": info})
+        failed_path.parent.mkdir(parents=True, exist_ok=True)
+        failed_path.write_text(datetime.now().isoformat(), encoding="utf-8")
+        return False
+
+    # Success — remove failed marker if exists
+    if failed_path.exists():
+        failed_path.unlink()
+
+    _add_message(user_id, "msg.auto_refresh", {"fx_detail": fx_detail})
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -299,6 +356,30 @@ def refresh_data(user_id):
     if not get_user(user_id):
         abort(404)
     ok = _do_refresh(user_id, auto=False)
+    if ok:
+        return jsonify({"status": "done"})
+    return jsonify({"status": "error"}), 500
+
+
+@app.route("/<user_id>/api/fx_status", methods=["GET"])
+def fx_status(user_id):
+    """Check if FX rates need auto-refresh (>24h old)."""
+    if not get_user(user_id):
+        abort(404)
+    status = _check_fx_stale(user_id)
+    return jsonify(status)
+
+
+@app.route("/<user_id>/api/auto_refresh", methods=["POST"])
+def auto_refresh(user_id):
+    """Trigger auto-refresh if FX rates are stale."""
+    if not get_user(user_id):
+        abort(404)
+    status = _check_fx_stale(user_id)
+    if not status.get("stale"):
+        return jsonify({"status": "not_needed", "detail": status})
+
+    ok = _do_auto_refresh(user_id)
     if ok:
         return jsonify({"status": "done"})
     return jsonify({"status": "error"}), 500
@@ -446,7 +527,6 @@ if __name__ == "__main__":
     for user in load_users():
         d = ROOT / user["data_dir"]
         (d / "logs").mkdir(parents=True, exist_ok=True)
-    _start_scheduler()
     app.run(host="0.0.0.0", port=8000, debug=False)
 
 
@@ -459,8 +539,3 @@ def on_starting(server):
     for user in load_users():
         d = ROOT / user["data_dir"]
         (d / "logs").mkdir(parents=True, exist_ok=True)
-
-
-def post_fork(server, worker):
-    """Start per-user daily scheduler in each worker process."""
-    _start_scheduler()

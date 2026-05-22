@@ -900,6 +900,9 @@ async function init() {
     updateAll();
     revealCards();
     createTxTooltip();
+
+    // Auto-refresh FX if stale (>24h) — fire and forget
+    checkAndAutoRefreshFx();
   } catch (error) {
     showToast(t("toast.failedToLoad"));
     console.error(error);
@@ -913,6 +916,26 @@ function fetchJson(path) {
     }
     return response.json();
   });
+}
+
+async function checkAndAutoRefreshFx() {
+  try {
+    const status = await fetch(`/${USER_ID}/api/fx_status`).then((r) => r.json());
+    if (!status.stale) return;
+
+    // FX is stale — trigger auto-refresh in background
+    console.log("FX rates stale, triggering auto-refresh:", status);
+    const res = await fetch(`/${USER_ID}/api/auto_refresh`, { method: "POST" });
+    if (res.ok) {
+      // Auto-refresh succeeded — reload to show updated data
+      setTimeout(() => location.reload(), 600);
+    } else {
+      // Auto-refresh failed — show notification
+      showToast(t("toast.autoRefreshFailed"), true);
+    }
+  } catch {
+    // Silently ignore — auto-refresh is best-effort
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -462,13 +462,11 @@ POST /<user_id>/api/parse
 | `msg.parse_started` | 解析开始 | 无 |
 | `msg.parse_done` | 解析完成 | `detail`（INFO 摘要） |
 | `msg.parse_error` | 解析失败 | `error` |
-| `msg.fx_done` | 汇率更新完成 | `detail` |
-| `msg.fx_error` | 汇率更新失败 | `error` |
-| `msg.processor_done` | 处理器完成 | 无 |
+| `msg.fx_error` | [manual] 汇率更新失败 | `error` |
+| `msg.auto_fx_error` | [auto] 汇率自动刷新失败 | `error` |
 | `msg.processor_error` | 处理器失败 | `error` |
-| `msg.parse_refresh_done` | 解析+刷新全部完成 | 无 |
-| `msg.refresh_done` | 手动刷新完成 | 无 |
-| `msg.auto_refresh` | 定时自动刷新完成 | 无 |
+| `msg.manual_refresh` | [manual] 手动刷新完成 | `fx_detail` |
+| `msg.auto_refresh` | [auto] 自动刷新完成 | `fx_detail` |
 | `msg.setup_complete` | 用户初始化完成 | 无 |
 | `msg.accounts_updated` | 账户配置更新 | `count` |
 | `msg.currencies_updated` | 货币配置更新 | `count` |
@@ -505,18 +503,29 @@ Toast: "配置已更新"
 api_server.py 启动时
     │
     ▼
-_schedule_all_users()
-    │   为每个用户创建 threading.Timer
-    │   目标时间：每天 04:00
-    ▼
-_on_daily_tick()
+checkAndAutoRefreshFx() (前端页面加载时)
     │
-    └── _do_refresh(user_id, auto=True)
+    ├── GET /<user_id>/api/fx_status
+    │   └── _check_fx_stale(user_id)
+    │       ├── 检查 fx_rate.json 的 updated_at
+    │       ├── 检查 fx_auto_refresh_failed 标记
+    │       └── 返回 { stale: bool, ... }
+    │
+    ▼ (if stale)
+POST /<user_id>/api/auto_refresh
+    │
+    └── _do_auto_refresh(user_id)
         ├── fetch_fx.py → 更新汇率
-        └── processor.py → 重新生成 UI 数据
+        ├── processor.py → 重新生成 UI 数据
+        └── 失败时写入 fx_auto_refresh_failed 标记
     │
     ▼
-_schedule_next() → 重新调度明天 04:00
+手动刷新 POST /<user_id>/api/refresh
+    │
+    └── _do_refresh(user_id, auto=False)
+        ├── fetch_fx.py → 更新汇率
+        ├── processor.py → 重新生成 UI 数据
+        └── 清除 fx_auto_refresh_failed 标记
 ```
 
 ---
@@ -545,7 +554,7 @@ _schedule_next() → 重新调度明天 04:00
 
 #### 3.1.2 `api_server.py` — Flask 服务器
 
-**职责**：应用的唯一入口点。提供 REST API 端点、静态文件服务、后台任务调度。
+**职责**：应用的唯一入口点。提供 REST API 端点、静态文件服务、FX 自动刷新检查。
 
 **函数清单**：
 
@@ -554,14 +563,13 @@ _schedule_next() → 重新调度明天 04:00
 | `load_users()` | 工具 | 读取 `users.json`，返回用户列表 |
 | `get_user(user_id)` | 工具 | 按 ID 查找单个用户 |
 | `user_data_dir(user_id)` | 工具 | 返回用户数据目录的绝对路径 |
-| `_add_message(user_id, key, params)` | 工具 | 添加通知消息（内存 + JSONL 持久化） |
+| `_add_message(user_id, key, params)` | 工具 | 添加通知消息（JSONL 持久化） |
 | `_extract_info(stdout)` | 工具 | 从子进程输出提取最后的 `[INFO]` 行 |
 | `_run_script(script, user_id)` | 工具 | 以子进程方式运行后端脚本，设置 `FINANCE_DATA_DIR` |
 | `_parse_watcher(user_id)` | 后台 | 解析监视器：运行 parser.py，成功后自动触发刷新 |
-| `_do_refresh(user_id, auto)` | 核心 | 运行 fetch_fx.py + processor.py |
-| `_schedule_all_users()` | 调度 | 为所有用户设置每日 04:00 定时刷新 |
-| `_schedule_next(user_id)` | 调度 | 创建下一个 04:00 的 Timer |
-| `_on_daily_tick(user_id)` | 回调 | 定时器触发时执行刷新并重新调度 |
+| `_do_refresh(user_id, auto)` | 核心 | 运行 fetch_fx.py + processor.py，手动刷新时清除失败标记 |
+| `_check_fx_stale(user_id)` | 核心 | 检查 FX 是否过期（>24h），返回 stale/failed 状态 |
+| `_do_auto_refresh(user_id)` | 核心 | 执行自动刷新，失败时写入 `fx_auto_refresh_failed` 标记 |
 | `landing_page()` | 路由 | `GET /` → landing.html |
 | `list_users()` | 路由 | `GET /api/users` → users.json |
 | `user_dashboard(user_id)` | 路由 | `GET /<user_id>/` → index.html |
@@ -573,6 +581,8 @@ _schedule_next() → 重新调度明天 04:00
 | `parse_pdfs(user_id)` | 路由 | `POST /<user_id>/api/parse` → 启动解析 |
 | `parse_status(user_id)` | 路由 | `GET /<user_id>/api/parse/status` → 解析状态 |
 | `refresh_data(user_id)` | 路由 | `POST /<user_id>/api/refresh` → 手动刷新 |
+| `fx_status(user_id)` | 路由 | `GET /<user_id>/api/fx_status` → FX 是否过期 |
+| `auto_refresh(user_id)` | 路由 | `POST /<user_id>/api/auto_refresh` → 触发自动刷新 |
 | `get_messages(user_id)` | 路由 | `GET /<user_id>/api/messages` → 通知列表 |
 | `setup_user(user_id)` | 路由 | `POST /<user_id>/api/setup` → 初始化用户 |
 | `get_accounts(user_id)` | 路由 | `GET /<user_id>/api/config/accounts` |
@@ -595,6 +605,8 @@ _schedule_next() → 重新调度明天 04:00
 | POST | `/<user_id>/api/parse` | 启动解析 |
 | GET | `/<user_id>/api/parse/status` | 解析状态 |
 | POST | `/<user_id>/api/refresh` | 手动刷新数据 |
+| GET | `/<user_id>/api/fx_status` | 检查 FX 是否过期 |
+| POST | `/<user_id>/api/auto_refresh` | 触发自动刷新 |
 | GET | `/<user_id>/api/messages` | 通知消息 |
 | POST | `/<user_id>/api/setup` | 初始化用户 |
 | GET | `/<user_id>/api/config/accounts` | 获取账户配置 |
@@ -861,13 +873,15 @@ state = {
 │    │                                  └──────────┘         │    │
 │    │                                                       │    │
 │    ├─ POST /<uid>/api/refresh ──▶ _do_refresh() ───────────┘    │
+│    ├─ GET /<uid>/api/fx_status ──▶ _check_fx_stale()            │
+│    ├─ POST /<uid>/api/auto_refresh ──▶ _do_auto_refresh()       │
 │    ├─ GET /<uid>/api/parse/status                               │
 │    ├─ GET /<uid>/api/messages                                   │
 │    ├─ POST /<uid>/api/setup                                     │
 │    ├─ GET/PUT /<uid>/api/config/accounts                        │
 │    └─ GET/PUT /<uid>/api/config/currencies                      │
 │                                                                 │
-│  定时任务: _schedule_all_users() → 每日 04:00 _do_refresh()     │
+│  FX 自动刷新: 前端页面加载时检查 >24h 则自动触发                  │
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
@@ -1417,8 +1431,14 @@ python src/backend/api_server.py
 `api_server.py` 启动时执行：
 
 1. 为所有用户创建 `logs/` 目录
-2. 调用 `_schedule_all_users()` 设置每日 04:00 定时刷新
-3. 启动 Flask 服务器，监听 `0.0.0.0:8000`
+2. 启动 Flask 服务器，监听 `0.0.0.0:8000`
+
+FX 自动刷新机制：
+
+- 前端页面加载时调用 `GET /<user_id>/api/fx_status` 检查 FX 是否过期（>24h）
+- 若过期则调用 `POST /<user_id>/api/auto_refresh` 触发自动刷新
+- 自动刷新失败时写入 `fx_auto_refresh_failed` 标记，阻止重复尝试
+- 用户手动刷新后清除标记，恢复自动刷新能力
 
 ### 6.2 访问方式
 

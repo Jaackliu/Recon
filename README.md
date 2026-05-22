@@ -87,7 +87,7 @@ AI_MODEL=your-model-name          # 必须支持多模态图片输入
 AI_BASE_URL=https://your-api-endpoint/anthropic
 AI_API_KEY=sk-your-api-key
 
-TIMEZONE=Asia/Shanghai            # 时区（影响定时任务和日志时间戳）
+TIMEZONE=Asia/Shanghai            # 时区（影响日志时间戳）
 ```
 
 > 系统使用 Anthropic SDK 调用 AI API，支持任何兼容 Anthropic Messages API 的端点。**所选模型必须支持多模态输入（图片）**，因为系统会将 PDF 页面渲染为 PNG 图片发送给 AI 进行识别。
@@ -333,9 +333,13 @@ PDF 银行账单
 
 生成三种货币视角：全局默认币种（汇率转换）、各账户默认币种、指定币种（仅过滤）。
 
-### 定时任务
+### FX 自动刷新
 
-服务启动后自动为每个用户设置每日 04:00 定时刷新（`fetch_fx.py` + `processor.py`），更新汇率和前端数据。
+用户访问 Dashboard 时，系统自动检查汇率数据是否过期（超过 24 小时）。若过期则自动触发 `fetch_fx.py` + `processor.py` 刷新汇率和前端数据。
+
+- 自动刷新失败时，系统会提示用户手动刷新，且不会重复尝试
+- 用户手动刷新后，自动刷新功能恢复
+- 所有刷新通知会标注 `[manual]`（手动）或 `[auto]`（自动）
 
 ---
 

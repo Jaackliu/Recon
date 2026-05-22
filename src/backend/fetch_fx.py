@@ -86,7 +86,7 @@ def build_iso_maps(currencies: List[Dict[str, str]]) -> Tuple[Dict[str, str], Di
     return code_to_iso, iso_to_code
 
 
-def fetch_from_frankfurter(iso_codes: List[str], timeout: float = 10.0) -> Dict[str, Any]:
+def fetch_from_frankfurter(iso_codes: List[str], timeout: float = 5.0) -> Dict[str, Any]:
     if not iso_codes:
         raise ValueError("iso_codes is empty")
     base_iso = "USD" if "USD" in iso_codes else iso_codes[0]

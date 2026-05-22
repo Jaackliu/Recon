@@ -407,6 +407,40 @@
   - **导航按钮 hover**：新增 `background: var(--surface-soft)` 微填充，阴影收小。
 - 修改文件：`src/frontend/styles.css`、`src/frontend/app.js`、`docs/frontend.md`
 
+## 2026-05-22 (FX 自动刷新改为 24 小时阈值)
+
+- **需求**：删除原有的凌晨 4 点定时刷新，改为距离用户上次 FX 更新时间超过 24 小时就自动刷新。如果自动刷新失败，则报错并提醒用户手动刷新，直到下一次手动刷新后才重新开始自动刷新。
+- **Notification 改进**：手动/自动刷新的 notification 需要明确标注 [manual] 或 [auto]。
+
+- **后端修改** (`src/backend/api_server.py`)：
+  - 删除 `_start_scheduler()` 函数及 APScheduler 依赖
+  - 新增 `_check_fx_stale(user_id)` 函数：检查 `fx_rate.json` 的 `updated_at` 是否超过 24 小时
+  - 新增 `_do_auto_refresh(user_id)` 函数：执行自动刷新，失败时写入 `fx_auto_refresh_failed` 标记文件
+  - `_do_refresh()` 函数：手动刷新时清除 `fx_auto_refresh_failed` 标记，notification 改为 `msg.manual_refresh`
+  - 新增 `/api/fx_status` 端点：返回 FX 是否过期
+  - 新增 `/api/auto_refresh` 端点：触发自动刷新
+  - 删除 `post_fork` 中的 `_start_scheduler()` 调用
+
+- **前端修改** (`src/frontend/app.js`)：
+  - 新增 `checkAndAutoRefreshFx()` 函数：页面加载时检查 FX 状态，若过期则自动触发刷新
+  - 自动刷新成功后自动重载页面，失败时显示 toast 提示
+
+- **翻译更新** (`src/frontend/multi-lang.json`)：
+  - 新增 `msg.manual_refresh`：手动刷新通知（zh/en/fr）
+  - 新增 `msg.auto_fx_error`：自动刷新失败通知（zh/en/fr）
+  - 修改 `msg.refresh_done` 为 `msg.manual_refresh`
+  - 修改 `msg.auto_refresh`：标注 [auto]
+  - 修改 `msg.fx_error`：标注 [manual]
+  - 新增 `toast.autoRefreshFailed`：自动刷新失败 toast（zh/en/fr）
+
+- **依赖更新** (`requirements.txt`)：
+  - 移除 `apscheduler>=3.10`
+
+- **失败恢复机制**：
+  - 自动刷新失败时写入 `data_users/<user_id>/logs/fx_auto_refresh_failed` 标记文件
+  - 标记文件存在时，`_check_fx_stale()` 返回 `stale: false`，阻止重复自动刷新
+  - 用户手动刷新时删除标记文件，恢复自动刷新能力
+
 ## Notes
 - Processor implementation complete; ready to run against sample data.
 - Parser implementation complete; processes PDFs via multimodal AI API.
