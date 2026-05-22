@@ -159,7 +159,7 @@ function triggerCalendarAnimate(mode) {
     dom.customRangePanel.classList.remove("is-animate");
     dom.customRangePanel.removeAttribute("data-calendar-motion");
     calendarAnimTimer = null;
-  }, 520);
+  }, 500);
 }
 
 /* ---- multi-lang helpers ---- */

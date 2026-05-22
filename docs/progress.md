@@ -394,6 +394,19 @@
 - 日期输入框新增聚焦高亮，Customize 按钮在展开时显示激活状态。
 - 修改文件：`src/frontend/styles.css`、`src/frontend/app.js`
 
+## 2026-05-22 (日历动效精简重设计)
+
+- **问题**：日历动效过于跳脱混乱——月份切换时 scale+translate 叠加产生跳跃感，日期选中时 `dayPop`（0.94→1.06→1）弹跳过猛叠加 `rangePulse` 盒影脉冲，视觉噪音过大。
+- **修改内容**：
+  - **面板展开**：缓动曲线从 `ease` 改为 `cubic-bezier(0.22, 1, 0.36, 1)`（decelerate），时长 0.4s，位移 8px，无缩放。
+  - **月份切换**：移除 `scale(0.98)`，改为纯水平位移 20px + 淡入（0.36s），方向与导航一致。
+  - **日期选中**：移除 `dayPop` + `rangePulse` 双重动画，替换为单一 `daySettle` 弹性落位动画（0.35s，scale 0.92→1.04→1，配合 opacity 渐入）。
+  - **起止日期样式**：背景从纯色 `var(--accent)` 改为 `linear-gradient(135deg, accent → accent-active)`，双环盒影改为柔和阴影 + canvas 边框，文字改为白色加粗。
+  - **区间日期样式**：移除 `inset` 盒影，简化为纯背景色 `var(--delta-positive-bg)`。
+  - **日历卡片阴影**：从单层改为双层（8px 扩散 + 1px 扩散），更精致。
+  - **导航按钮 hover**：新增 `background: var(--surface-soft)` 微填充，阴影收小。
+- 修改文件：`src/frontend/styles.css`、`src/frontend/app.js`、`docs/frontend.md`
+
 ## Notes
 - Processor implementation complete; ready to run against sample data.
 - Parser implementation complete; processes PDFs via multimodal AI API.

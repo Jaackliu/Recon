@@ -410,11 +410,11 @@ input {
   border-top: 1px dashed transparent;
   max-height: 0;
   opacity: 0;
-  transform: translateY(-6px);
+  transform: translateY(-8px);
   visibility: hidden;
   pointer-events: none;
   overflow: hidden;
-  transition: max-height 0.35s ease, opacity 0.25s ease, transform 0.3s ease, padding 0.3s ease, margin 0.3s ease, border-color 0.3s ease, visibility 0s linear 0.35s;
+  transition: max-height 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.35s ease, transform 0.38s cubic-bezier(0.22, 1, 0.36, 1), padding 0.38s ease, margin 0.38s ease, border-color 0.38s ease, visibility 0s linear 0.4s;
   will-change: max-height, opacity, transform;
   transform-origin: top;
 }
@@ -428,7 +428,7 @@ input {
   border-top-color: var(--hairline);
   visibility: visible;
   pointer-events: auto;
-  transition: max-height 0.35s ease, opacity 0.25s ease, transform 0.3s ease, padding 0.3s ease, margin 0.3s ease, border-color 0.3s ease, visibility 0s linear 0s;
+  transition: max-height 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease 0.05s, transform 0.38s cubic-bezier(0.22, 1, 0.36, 1), padding 0.38s ease, margin 0.38s ease, border-color 0.38s ease, visibility 0s linear 0s;
 }
 
 .custom-range-inputs {
@@ -442,7 +442,7 @@ input {
 }
 
 .custom-range-panel.is-open.is-animate .custom-range-inputs {
-  animation: rangeInputsReveal 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: rangeInputsReveal 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .date-input {
@@ -488,25 +488,26 @@ input {
   border: 1px solid var(--hairline);
   background: var(--canvas);
   cursor: pointer;
-  transition: transform 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.22s ease, border-color 0.22s ease, color 0.22s ease, box-shadow 0.22s ease, background 0.22s ease;
 }
 
 .calendar-nav-btn:hover:not(:disabled) {
   border-color: var(--accent);
   color: var(--accent);
+  background: var(--surface-soft);
   transform: translateY(-1px);
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
 }
 
 .calendar-nav-btn:disabled {
-  opacity: 0.4;
+  opacity: 0.35;
   cursor: not-allowed;
 }
 
 .calendar-stack {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
 }
 
 .calendar {
@@ -514,35 +515,36 @@ input {
   border-radius: var(--radius-md);
   padding: 10px;
   background: linear-gradient(180deg, var(--surface-soft) 0%, var(--canvas) 100%);
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.06);
-  transition: transform 0.25s ease, box-shadow 0.25s ease, opacity 0.25s ease;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease, opacity 0.3s ease;
   will-change: transform, opacity;
 }
 
 .custom-range-panel.is-open.is-animate[data-calendar-motion="open"] .calendar {
-  animation: calendarRise 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation: calendarRise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .custom-range-panel.is-open.is-animate[data-calendar-motion="next"] .calendar {
-  animation: calendarShiftNext 0.32s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation: calendarShiftNext 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .custom-range-panel.is-open.is-animate[data-calendar-motion="prev"] .calendar {
-  animation: calendarShiftPrev 0.32s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation: calendarShiftPrev 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .custom-range-panel.is-open.is-animate .calendar:nth-of-type(1) {
-  animation-delay: 0.03s;
+  animation-delay: 0.04s;
 }
 
 .custom-range-panel.is-open.is-animate .calendar:nth-of-type(2) {
-  animation-delay: 0.08s;
+  animation-delay: 0.1s;
 }
 
 .custom-range-panel.is-open.is-animate[data-calendar-motion="open"] .calendar-nav,
 .custom-range-panel.is-open.is-animate[data-calendar-motion="next"] .calendar-nav,
 .custom-range-panel.is-open.is-animate[data-calendar-motion="prev"] .calendar-nav {
-  animation: calendarNavSlide 0.3s ease both;
+  animation: calendarNavSlide 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: 0.12s;
 }
 
 .calendar-header {
@@ -585,18 +587,19 @@ input {
   color: var(--ink);
   font-variant-numeric: tabular-nums;
   position: relative;
-  transition: transform 0.15s ease, background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, filter 0.2s ease;
+  transition: transform 0.18s ease, background 0.22s ease, color 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
   will-change: transform, box-shadow;
 }
 
 .calendar-day:not(.is-disabled):hover {
   border-color: var(--accent);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
   transform: translateY(-1px);
 }
 
 .calendar-day:not(.is-disabled):active {
-  transform: scale(0.98);
+  transform: scale(0.97);
+  transition-duration: 0.1s;
 }
 
 .calendar-day:focus-visible {
@@ -607,73 +610,40 @@ input {
 
 .calendar-day.is-other {
   color: var(--muted);
-  opacity: 0.45;
+  opacity: 0.4;
 }
 
 .calendar-day.is-disabled {
   color: var(--muted);
-  opacity: 0.35;
+  opacity: 0.3;
   cursor: not-allowed;
   background: var(--surface-strong);
 }
 
 .calendar-day.is-in-range {
-  background: linear-gradient(180deg, var(--delta-positive-bg) 0%, var(--surface-soft) 100%);
+  background: var(--delta-positive-bg);
   border-color: transparent;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.04);
 }
 
 .calendar-day.is-start,
 .calendar-day.is-end {
-  background: var(--accent);
-  color: var(--canvas);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-active) 100%);
+  color: #ffffff;
+  font-weight: 600;
   z-index: 1;
-  box-shadow: 0 0 0 2px var(--canvas), 0 0 0 4px var(--accent);
-  animation: dayPop 0.2s ease;
+  border-color: transparent;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12), 0 0 0 2px var(--canvas);
 }
 
 .custom-range-panel.is-open.is-animate[data-calendar-motion="select"] .calendar-day.is-start,
 .custom-range-panel.is-open.is-animate[data-calendar-motion="select"] .calendar-day.is-end {
-  animation: dayPop 0.22s ease, rangePulse 0.45s ease-out;
+  animation: daySettle 0.35s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @keyframes calendarRise {
   from {
     opacity: 0;
-    transform: translateY(8px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes calendarShiftNext {
-  from {
-    opacity: 0.6;
-    transform: translateX(14px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0) scale(1);
-  }
-}
-
-@keyframes calendarShiftPrev {
-  from {
-    opacity: 0.6;
-    transform: translateX(-14px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0) scale(1);
-  }
-}
-
-@keyframes calendarNavSlide {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
@@ -681,19 +651,29 @@ input {
   }
 }
 
-@keyframes dayPop {
-  0% {
-    transform: scale(0.94);
+@keyframes calendarShiftNext {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
   }
-  60% {
-    transform: scale(1.06);
-  }
-  100% {
-    transform: scale(1);
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }
 
-@keyframes rangeInputsReveal {
+@keyframes calendarShiftPrev {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes calendarNavSlide {
   from {
     opacity: 0;
     transform: translateY(-6px);
@@ -704,12 +684,28 @@ input {
   }
 }
 
-@keyframes rangePulse {
+@keyframes daySettle {
   0% {
-    box-shadow: 0 0 0 2px var(--canvas), 0 0 0 4px var(--accent), 0 0 0 0 rgba(0, 0, 0, 0.18);
+    transform: scale(0.92);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.04);
   }
   100% {
-    box-shadow: 0 0 0 2px var(--canvas), 0 0 0 4px var(--accent), 0 0 0 10px rgba(0, 0, 0, 0);
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes rangeInputsReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
