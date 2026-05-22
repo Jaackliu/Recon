@@ -1282,7 +1282,60 @@ function bindEvents() {
     }
   });
 
-  dom.uploadFileBtn.addEventListener("click", () => dom.fileInput.click());
+  let uploadLongPressTimer = null;
+  let uploadLongPressTriggered = false;
+
+  function clearUploadLongPress() {
+    if (uploadLongPressTimer) {
+      clearTimeout(uploadLongPressTimer);
+      uploadLongPressTimer = null;
+    }
+  }
+
+  function handleUploadLongPress() {
+    uploadLongPressTriggered = true;
+    fetch(`/${USER_ID}/api/open_raw_input`, { method: "POST" })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.opened) {
+          showToast(t("toast.folderOpened"));
+        } else if (data.path) {
+          navigator.clipboard.writeText(data.path).then(
+            () => showToast(t("toast.folderPathCopied") + ": " + data.path),
+            () => showToast(t("toast.folderPathCopied") + ": " + data.path)
+          );
+        }
+      })
+      .catch(() => showToast(t("toast.folderOpenFailed"), true));
+  }
+
+  dom.uploadFileBtn.addEventListener("mousedown", (event) => {
+    event.preventDefault();
+    uploadLongPressTriggered = false;
+    clearUploadLongPress();
+    uploadLongPressTimer = setTimeout(handleUploadLongPress, 600);
+  });
+
+  dom.uploadFileBtn.addEventListener("mouseup", clearUploadLongPress);
+  dom.uploadFileBtn.addEventListener("mouseleave", clearUploadLongPress);
+
+  dom.uploadFileBtn.addEventListener("touchstart", (event) => {
+    uploadLongPressTriggered = false;
+    clearUploadLongPress();
+    uploadLongPressTimer = setTimeout(handleUploadLongPress, 600);
+  }, { passive: true });
+
+  dom.uploadFileBtn.addEventListener("touchend", clearUploadLongPress);
+  dom.uploadFileBtn.addEventListener("touchcancel", clearUploadLongPress);
+
+  dom.uploadFileBtn.addEventListener("click", (event) => {
+    if (uploadLongPressTriggered) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    } else {
+      dom.fileInput.click();
+    }
+  });
   dom.fileInput.addEventListener("change", handleFileUpload);
   dom.parsePdfBtn.addEventListener("click", handleParsePdf);
   dom.refreshDataBtn.addEventListener("click", handleRefreshData);

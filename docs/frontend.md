@@ -94,7 +94,7 @@
     *   **日期格式 (Date Format)**：提供四个选项 - “YYYY-MM-DD”、”YYYY/MM/DD”、”DD/MM/YYYY”、”MM/DD/YYYY”。切换后所有日期显示（交易列表、详情弹窗、余额概览、时间范围、图表 Tooltip 等）即时按新格式重新渲染。
     *   **配置管理 (Config Management)**：提供”管理账户”和”管理货币”按钮，点击后弹出配置列表弹窗，支持在线添加、编辑和删除账户/货币配置。
     *   **操作按钮**：
-        *   **上传 PDF (Upload)**：点击后打开文件选择器，支持上传银行账单 PDF 到用户的 `raw_input/` 目录。
+        *   **上传 PDF (Upload)**：点击后打开文件选择器，支持上传银行账单 PDF 到用户的 `raw_input/` 目录。**长按（600ms）**则打开对应操作系统的文件管理器（Finder / 资源管理器）并定位到 `raw_input/` 文件夹，方便直接管理文件。
         *   **解析 PDF (Parse PDF)**：点击后触发完整数据管线（`parser.py` → `fetch_fx.py` → `processor.py`），解析完成后自动刷新页面。
         *   **刷新数据 (Refresh Data)**：点击后手动触发 `fetch_fx.py` + `processor.py`，更新汇率和前端数据。
 *   **数据持久化**：

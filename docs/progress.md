@@ -407,6 +407,29 @@
   - **导航按钮 hover**：新增 `background: var(--surface-soft)` 微填充，阴影收小。
 - 修改文件：`src/frontend/styles.css`、`src/frontend/app.js`、`docs/frontend.md`
 
+## 2026-05-22 (长按上传按钮打开 raw_input 文件夹)
+
+- **需求**：允许长按上传文件按钮，打开对应用户的 raw_input 文件夹进行文件管理。
+- **架构**：
+  - 新增 `scripts/host_bridge.py`：宿主机 HTTP 桥接服务（监听 `127.0.0.1:18923`），Docker 通过 `host.docker.internal:18923` 调用。跨平台支持：macOS 调用 `open`、Windows 调用 `os.startfile`、Linux 调用 `xdg-open`。Docker Desktop for Mac / Docker Desktop for Windows 均内置支持 `host.docker.internal`。
+  - 桥接服务未运行时，前端自动降级为复制路径到剪贴板。
+- **后端修改**：
+  - 新增 `POST /<user_id>/api/open_raw_input` API 端点：
+    - 非 Docker 环境（macOS/Linux/Windows）：直接调用 `open` / `xdg-open` / `os.startfile`。
+    - Docker 环境：通过 `HOST_PWD` 环境变量计算 Host 端真实路径，向 `host.docker.internal:18923` 发送 GET 请求，由桥接服务打开 Finder。
+  - 若 raw_input/ 目录不存在，自动创建。
+  - `docker-compose.yml` 新增 `HOST_PWD=${PWD}` 环境变量。
+- **前端修改**：
+  - `app.js`：为 `#uploadFileBtn` 添加长按检测逻辑（mousedown/touchstart 启动 600ms 计时器，mouseup/mouseleave/touchend/touchcancel 取消）。
+    - 长按触发 API 调用；API 返回 `opened: true` 则显示"已打开文件夹"。
+    - API 返回 `opened: false`（桥接服务未运行）则复制路径到剪贴板，Toast 提示"路径已复制，在 Finder 中使用 Cmd+Shift+G 前往"。
+    - 短按仍触发文件上传。
+  - `multi-lang.json`：新增 `toast.folderOpened`、`toast.folderPathCopied`、`toast.folderOpenFailed` 翻译键（zh/en/fr）。
+- **文档更新**：
+  - `docs/frontend.md`：更新设置弹窗"上传 PDF"按钮说明，添加长按行为描述。
+  - `docs/progress.md`：记录完整实现细节。
+  - `README.md`：交互功能列表新增文件管理快捷入口；Docker 部署新增步骤 3（启动桥接服务）。
+
 ## 2026-05-22 (FX 自动刷新改为 24 小时阈值)
 
 - **需求**：删除原有的凌晨 4 点定时刷新，改为距离用户上次 FX 更新时间超过 24 小时就自动刷新。如果自动刷新失败，则报错并提醒用户手动刷新，直到下一次手动刷新后才重新开始自动刷新。

@@ -385,6 +385,68 @@ def auto_refresh(user_id):
     return jsonify({"status": "error"}), 500
 
 
+@app.route("/<user_id>/api/open_raw_input", methods=["POST"])
+def open_raw_input(user_id):
+    """Open the user's raw_input folder in the OS file manager.
+
+    - Direct macOS/Windows/Linux: runs open/xdg-open/startfile directly.
+    - Docker: writes the host path to a FIFO shared with the host;
+      host_folder_bridge.sh reads it and runs open on the host.
+    """
+    if not get_user(user_id):
+        abort(404)
+    raw_dir = user_data_dir(user_id) / "raw_input"
+    raw_dir.mkdir(parents=True, exist_ok=True)
+
+    in_docker = os.path.exists("/.dockerenv")
+
+    if in_docker:
+        host_pwd = os.environ.get("HOST_PWD", "")
+        if host_pwd:
+            container_path = str(raw_dir)
+            if container_path.startswith("/app/"):
+                host_path = os.path.join(host_pwd, container_path[len("/app/"):])
+            else:
+                host_path = container_path
+        else:
+            host_path = str(raw_dir)
+
+        # Call the host bridge via host.docker.internal
+        import urllib.request
+        opened = False
+        try:
+            url = f"http://host.docker.internal:18923/?path={urllib.request.quote(host_path)}"
+            req = urllib.request.Request(url, method="GET")
+            resp = urllib.request.urlopen(req, timeout=2)
+            if resp.status == 200:
+                opened = True
+        except Exception:
+            pass  # bridge not running — frontend falls back to clipboard
+
+        return jsonify({
+            "status": "ok",
+            "path": host_path,
+            "opened": opened,
+        })
+
+    # Not in Docker — open directly
+    opened = False
+    try:
+        if sys.platform == "darwin":
+            subprocess.run(["open", str(raw_dir)], check=True)
+            opened = True
+        elif sys.platform == "win32":
+            os.startfile(str(raw_dir))
+            opened = True
+        else:
+            subprocess.run(["xdg-open", str(raw_dir)], check=True)
+            opened = True
+    except Exception:
+        pass
+
+    return jsonify({"status": "ok", "path": str(raw_dir), "opened": opened})
+
+
 @app.route("/<user_id>/api/messages", methods=["GET"])
 def get_messages(user_id):
     if not get_user(user_id):

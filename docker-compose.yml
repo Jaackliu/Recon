@@ -11,6 +11,7 @@ services:
       - ./.env:/app/.env:ro
     environment:
       - TZ=${TIMEZONE:-Asia/Shanghai}
+      - HOST_PWD=${PWD}
     env_file:
       - .env
     healthcheck:

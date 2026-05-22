@@ -37,6 +37,7 @@
 - **交易列表**：支持按时间/金额排序，按收入/支出/退款/转账筛选
 - **主题切换**：浅色 / 深色 / 跟随系统；两种图表配色方案可选
 - **设置管理**：在线编辑账户配置和货币配置
+- **文件管理快捷入口**：长按"上传文件"按钮可直接打开对应操作系统的文件管理器（macOS Finder / Windows 资源管理器），定位到用户的 `raw_input/` 文件夹
 - **多用户支持**：每个用户拥有完全隔离的数据目录，通过 Landing Page 选择身份进入
 - **三语支持**：界面支持简体中文、English、Français
 
@@ -226,7 +227,17 @@ docker compose version
 - `users.json`（用户注册表）
 - `data_users/<user_id>/config/`（账户和货币配置，可选——首次使用时通过引导页创建）
 
-#### 3. 构建并启动
+#### 3. 启动宿主机桥接服务（推荐）
+
+长按"上传文件"按钮可打开操作系统的文件管理器（macOS Finder / Windows 资源管理器 / Linux 文件管理器），定位到 `raw_input/` 文件夹。该功能需要宿主机运行桥接服务：
+
+```bash
+python scripts/host_bridge.py &
+```
+
+> 桥接服务监听 `127.0.0.1:18923`，仅本机可访问，Docker 通过 `host.docker.internal` 调用（Docker Desktop for Mac / Docker Desktop for Windows 均内置支持）。不启动桥接服务时，长按按钮会改为复制路径到剪贴板。
+
+#### 4. 构建并启动
 
 ```bash
 docker compose up -d --build
@@ -236,7 +247,7 @@ docker compose up -d --build
 
 访问 **`http://localhost:8000/`** ，选择用户身份进入 Dashboard。建议将此地址保存为浏览器书签，方便日后快速访问。
 
-#### 4. 常用命令
+#### 5. 常用命令
 
 | 操作 | 命令 |
 | :--- | :--- |
@@ -246,7 +257,17 @@ docker compose up -d --build
 | 重启服务 | `docker compose restart` |
 | 更新后重新构建 | `docker compose up -d --build` |
 
-#### 5. 数据持久化
+#### 6. 停止所有服务
+
+```bash
+# 停止 Docker 容器
+docker compose down
+
+# 停止桥接服务（如果启动了）
+pkill -f host_bridge.py
+```
+
+#### 7. 数据持久化
 
 容器通过挂载宿主机目录实现数据持久化：
 
