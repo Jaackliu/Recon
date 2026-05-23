@@ -499,6 +499,42 @@
   - `docs/process.md`：更新处理管线说明，添加中止机制注释
   - `README.md`：交互功能列表和解析管线章节添加中止功能说明
 
+## 2026-05-23 (交易日期显示星期几)
+
+- **需求**：在所有交易的小日期显示旁边加上星期几，包括交易页面、每日详情弹窗、类别详情弹窗、Tooltip 等。
+- **修改内容**：
+  - `multi-lang.json`：新增 `weekday.0` ~ `weekday.6` 翻译键（zh: 周日~周六, en: Sun~Sat, fr: dim.~sam.）。
+  - `app.js`：新增 `getWeekdayName(isoDate)` 和 `formatDateWithWeekday(isoDate)` 辅助函数；所有交易日期显示处改用 `formatDateWithWeekday`：
+    - `updateTransactionsView()`：交易行 `.meta` 日期
+    - `renderDetailList()`：详情行 `.meta` 日期
+    - `showTxTooltip()`：Tooltip 日期行
+    - `openDayDetail()`：弹窗副标题和指标日期
+    - `openCategoryDetail()`：弹窗副标题和指标范围日期
+    - `updateDailyChart()`：每日图表 Tooltip 日期
+    - `updateHeatmap()`：热力图 Tooltip 日期
+  - `frontend.md`：更新交易列表日期字段和模块 E 弹窗描述。
+- **效果**：所有交易日期显示格式为 `2026-05-23 周五`，星期跟随语言设置。
+
+## 2026-05-23 (修复热力图月份和日历星期多语言)
+
+- **问题**：热力图（模块C）月份标签和自定义日历的星期标签未随语言切换而更新。
+- **根因**：
+  - 热力图使用 ECharts 内置 `nameMap: state.language`，但传递的是 `"zh"` 而 ECharts 期望 `"zh-cn"`，导致中文月份名回退为英文。
+  - 日历 `getWeekdayLabels()` 硬编码返回英文缩写 `["S","M","T","W","T","F","S"]`。
+- **修复**：
+  - `multi-lang.json`：新增 `cal.day.0`~`cal.day.6`（日历星期缩写）和 `month.short.0`~`month.short.11`（月份缩写）翻译键（zh/en/fr）。
+  - `app.js`：`getWeekdayLabels()` 改为从 `t("cal.day.X")` 动态获取；热力图 `monthLabel.nameMap` 改为自定义翻译数组。
+- 修改文件：`multi-lang.json`、`app.js`
+
+## 2026-05-23 (刷新消息标签分类与翻译)
+
+- **需求**：将数据刷新通知消息的标签分为 `[manual]`（仅手动点击刷新按钮）和 `[system]`（其余所有自动刷新等），两种标签均需翻译。
+- **修改内容**：
+  - `multi-lang.json`：新增 `msg.tag.manual` 和 `msg.tag.system` 翻译键（zh: 手动/系统, en: manual/system, fr: manuel/système）。
+  - `msg.auto_fx_error` 和 `msg.auto_refresh` 标签从 `[auto]` 改为 `[system]`（及其翻译）。
+  - `msg.fx_error` 和 `msg.manual_refresh` 保持 `[manual]` 不变（均为手动触发）。
+- 修改文件：`multi-lang.json`
+
 ## Notes
 - Processor implementation complete; ready to run against sample data.
 - Parser implementation complete; processes PDFs via multimodal AI API.

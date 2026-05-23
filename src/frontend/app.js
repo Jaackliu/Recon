@@ -216,6 +216,20 @@ function formatDate(isoDate) {
   }
 }
 
+function getWeekdayName(isoDate) {
+  if (!isoDate || isoDate.length < 10) return "";
+  const date = parseIsoDate(isoDate);
+  if (!date) return "";
+  return t("weekday." + date.getUTCDay());
+}
+
+function formatDateWithWeekday(isoDate) {
+  const formatted = formatDate(isoDate);
+  const weekday = getWeekdayName(isoDate);
+  if (!weekday) return formatted;
+  return `${formatted} ${weekday}`;
+}
+
 function pad2(value) {
   return String(value).padStart(2, "0");
 }
@@ -291,7 +305,7 @@ function getMonthLabel(year, month) {
 }
 
 function getWeekdayLabels() {
-  return ["S", "M", "T", "W", "T", "F", "S"];
+  return [0, 1, 2, 3, 4, 5, 6].map((d) => t("cal.day." + d));
 }
 
 function setActiveDateFormatOption() {
@@ -1697,7 +1711,7 @@ function updateHeatmap() {
   const option = {
     tooltip: {
       confine: true,
-      formatter: (params) => `${formatDate(params.data[0])}<br/>${formatMoney(params.data[1])}`
+      formatter: (params) => `${formatDateWithWeekday(params.data[0])}<br/>${formatMoney(params.data[1])}`
     },
     visualMap: {
       min: -rangeAbs,
@@ -1729,7 +1743,7 @@ function updateHeatmap() {
         color: theme.muted,
         fontSize: 10,
         margin: 4,
-        nameMap: state.language,
+        nameMap: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((m) => t("month.short." + m)),
         position: "start"
       },
       dayLabel: { show: false }
@@ -1856,7 +1870,7 @@ function updateDailyChart(slice) {
         snap: true
       },
       formatter: (params) => {
-        let result = formatDate(params[0].axisValue) + "<br/>";
+        let result = formatDateWithWeekday(params[0].axisValue) + "<br/>";
         params.forEach((p) => {
           result += `${p.marker} ${p.seriesName}: ${formatMoney(p.value)}<br/>`;
         });
@@ -2095,7 +2109,7 @@ function updateTransactionsView() {
     row.innerHTML = `
       <div>
         <strong>${escapeHtml(item.description)}</strong>
-        <div class="meta">${escapeHtml(formatDate(item.date))}</div>
+        <div class="meta">${escapeHtml(formatDateWithWeekday(item.date))}</div>
       </div>
       <div class="meta">${escapeHtml(getAlias(item.alias))}</div>
       <div><span class="tag ${item.type}">${formatType(item.type)}</span></div>
@@ -2201,9 +2215,9 @@ function openDayDetail(date) {
 
   const netflow = round2(entry.all_inflow + entry.all_outflow);
   dom.detailTitle.textContent = t("detail.dailyDetails");
-  dom.detailSubtitle.textContent = `${formatDate(date)} · ${getAccountLabel(state.account)}`;
+  dom.detailSubtitle.textContent = `${formatDateWithWeekday(date)} · ${getAccountLabel(state.account)}`;
   renderDetailMetrics([
-    { label: t("detail.date"), value: formatDate(date) },
+    { label: t("detail.date"), value: formatDateWithWeekday(date) },
     { label: t("detail.endBalance"), value: formatMoney(entry.end_balance) },
     { label: t("detail.netflow"), value: formatMoney(netflow) },
     { label: t("detail.inflow"), value: formatMoney(entry.all_inflow) },
@@ -2231,10 +2245,10 @@ function openCategoryDetail(category, categoryType) {
   const typeLabel = formatType(categoryType);
 
   dom.detailTitle.textContent = `${typeLabel} ${t("detail.categorySuffix")}`;
-  dom.detailSubtitle.textContent = `${translateCategory(category)} · ${formatDate(range.startDate)} — ${formatDate(range.endDate)}`;
+  dom.detailSubtitle.textContent = `${translateCategory(category)} · ${formatDateWithWeekday(range.startDate)} — ${formatDateWithWeekday(range.endDate)}`;
   renderDetailMetrics([
     { label: t("detail.category"), value: translateCategory(category) },
-    { label: t("detail.range"), value: `${formatDate(range.startDate)} — ${formatDate(range.endDate)}` },
+    { label: t("detail.range"), value: `${formatDateWithWeekday(range.startDate)} — ${formatDateWithWeekday(range.endDate)}` },
     { label: t("detail.transactions"), value: String(transactions.length) },
     { label: t("detail.totalAmount"), value: formatMoney(total) }
   ]);
@@ -2269,7 +2283,7 @@ function renderDetailList() {
     row._txData = item;
     if (index < 15) row.style.animationDelay = `${index * 20}ms`;
     row.innerHTML = `
-      <div><strong>${escapeHtml(item.description)}</strong><div class="meta">${escapeHtml(formatDate(item.date))}</div></div>
+      <div><strong>${escapeHtml(item.description)}</strong><div class="meta">${escapeHtml(formatDateWithWeekday(item.date))}</div></div>
       <div><span class="tag category">${escapeHtml(translateCategory(item.category))}</span></div>
       <div><span class="tag ${item.type}">${formatType(item.type)}</span></div>
       <div class="detail-amount">${formatSignedMoney(item.amount, item.cashflow_direction)}</div>
@@ -3012,7 +3026,7 @@ function showTxTooltip(tx, event) {
   const currencyLabel = currency ? `${getAlias(currency.alias)} (${currency.currency_symbol})` : tx.currency;
   const rows = [
     [t("tooltip.transactionId"), tx.id],
-    [t("tooltip.date"), formatDate(tx.date)],
+    [t("tooltip.date"), formatDateWithWeekday(tx.date)],
     [t("tooltip.accountCode"), tx.account_code],
     [t("tooltip.accountAlias"), getAlias(tx.alias)],
     [t("tooltip.typeCode"), `${tx.type_code} (${formatType(tx.type)})`],

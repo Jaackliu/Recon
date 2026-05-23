@@ -188,7 +188,7 @@ def _parse_watcher(user_id: str):
             else:
                 _add_message(user_id, "msg.parse_done", {"detail": info})
             # Auto-refresh: fetch FX rates and regenerate UI data
-            _do_refresh(user_id, auto=False)
+            _do_refresh(user_id, auto=True)
         else:
             _add_message(user_id, "msg.parse_error", {"error": info})
     except Exception as exc:
