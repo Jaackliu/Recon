@@ -1,6 +1,6 @@
-# Personal Finance Dashboard 数据架构与契约设计
+# Recon 数据架构与契约设计
 
-本文档定义了 Personal Finance Dashboard 项目的后端数据模型、核心文件契约以及关键业务处理逻辑。本文件是项目后端数据架构的**唯一真理来源 (Single Source of Truth)**，后续所有的数据解析、清洗和前端 API 生成均需严格遵循此规范。
+本文档定义了 Recon 项目的后端数据模型、核心文件契约以及关键业务处理逻辑。本文件是项目后端数据架构的**唯一真理来源 (Single Source of Truth)**，后续所有的数据解析、清洗和前端 API 生成均需严格遵循此规范。
 
 ---
 

@@ -1,7 +1,7 @@
 services:
-  finance-dashboard:
+  recon:
     build: .
-    container_name: finance-dashboard
+    container_name: recon
     restart: unless-stopped
     ports:
       - "8000:8000"

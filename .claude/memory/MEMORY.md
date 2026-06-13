@@ -1,0 +1,1 @@
+- [No Hardcoded API Name](feedback_no_hardcoded_api.md) — Never hardcode model names in docs/code; always reference .env

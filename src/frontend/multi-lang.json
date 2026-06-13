@@ -1,6 +1,6 @@
 {
   "zh": {
-    "brand.title": "财务看板",
+    "brand.title": "Recon",
     "nav.dashboard": "仪表盘",
     "nav.transactions": "交易流水",
     "sidebar.accounts": "账户",
@@ -179,7 +179,7 @@
     "cat.Subsidy": "补助",
     "cat.Tax & Interest": "税息",
     "cat.Education": "教育",
-    "onboarding.welcome": "欢迎使用财务看板",
+    "onboarding.welcome": "欢迎使用 Recon",
     "onboarding.subtitle": "只需几步即可完成初始设置。",
     "onboarding.chooseCurrency": "选择默认货币",
     "onboarding.addAccount": "添加第一个银行账户",
@@ -236,7 +236,7 @@
     "msg.currencies_updated": "货币配置已更新（{count} 种货币）"
   },
   "en": {
-    "brand.title": "Finance Dashboard",
+    "brand.title": "Recon",
     "nav.dashboard": "Dashboard",
     "nav.transactions": "Transactions",
     "sidebar.accounts": "Accounts",
@@ -415,7 +415,7 @@
     "cat.Subsidy": "Subsidy",
     "cat.Tax & Interest": "Tax & Interest",
     "cat.Education": "Education",
-    "onboarding.welcome": "Welcome to Finance Dashboard",
+    "onboarding.welcome": "Welcome to Recon",
     "onboarding.subtitle": "Set up your profile in a few steps.",
     "onboarding.chooseCurrency": "Choose your default currency",
     "onboarding.addAccount": "Add your first bank account",
@@ -472,7 +472,7 @@
     "msg.currencies_updated": "Currencies updated ({count} currency/currencies)"
   },
   "fr": {
-    "brand.title": "Tableau de bord financier",
+    "brand.title": "Recon",
     "nav.dashboard": "Tableau de bord",
     "nav.transactions": "Transactions",
     "sidebar.accounts": "Comptes",
@@ -651,7 +651,7 @@
     "cat.Subsidy": "Subvention",
     "cat.Tax & Interest": "Impôts & Intérêts",
     "cat.Education": "Éducation",
-    "onboarding.welcome": "Bienvenue sur Finance Dashboard",
+    "onboarding.welcome": "Bienvenue sur Recon",
     "onboarding.subtitle": "Configurez votre profil en quelques étapes.",
     "onboarding.chooseCurrency": "Choisissez votre devise par défaut",
     "onboarding.addAccount": "Ajoutez votre premier compte bancaire",

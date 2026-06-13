@@ -1,6 +1,6 @@
-# Personal Finance Dashboard 前端架构与契约设计
+# Recon 前端架构与契约设计
 
-本文档定义了 Personal Finance Dashboard 项目的前端页面结构、组件布局以及核心交互与数据展示逻辑。本文件是项目前端架构的**唯一真理来源 (Single Source of Truth)**，后续所有的前端组件划分、状态管理与图表渲染均需严格遵循此规范。
+本文档定义了 Recon 项目的前端页面结构、组件布局以及核心交互与数据展示逻辑。本文件是项目前端架构的**唯一真理来源 (Single Source of Truth)**，后续所有的前端组件划分、状态管理与图表渲染均需严格遵循此规范。
 
 ---
 

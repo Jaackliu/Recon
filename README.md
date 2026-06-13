@@ -1,4 +1,4 @@
-# Finance Dashboard
+# Recon
 
 本地运行的轻量级记账与资产可视化平台。上传银行账单 PDF，AI 自动解析交易记录，生成交互式仪表盘。
 
@@ -293,8 +293,8 @@ pkill -f host_bridge.py
 
 ```bash
 # 创建 conda 环境（推荐）
-conda create -n fina-dashboard python=3.12 -y
-conda activate fina-dashboard
+conda create -n recon python=3.12 -y
+conda activate recon
 
 # 安装依赖
 pip install -r requirements.txt

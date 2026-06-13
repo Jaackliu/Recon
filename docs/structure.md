@@ -1,4 +1,4 @@
-# Personal Finance Dashboard 系统架构与流程详解
+# Recon 系统架构与流程详解
 
 本文档是项目的**全景架构参考**，旨在让读者从零开始完整理解整个系统的运行流程、模块职责、数据流转与代码组织。配合 [schema.md](schema.md)（数据契约）、[process.md](process.md)（处理器管线）、[frontend.md](frontend.md)（前端规范）阅读效果更佳。
 
@@ -27,7 +27,7 @@
 ### 1.3 项目目录结构
 
 ```
-finance-dashboard/
+recon/
 ├── .claude/                        # Claude Code 配置
 ├── .env                            # AI API 密钥与模型配置
 ├── docs/                           # 项目文档
@@ -85,7 +85,7 @@ finance-dashboard/
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                         Finance Dashboard 系统管线                           │
+│                         Recon 系统管线                           │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌───────┐ │
@@ -1420,7 +1420,7 @@ processor.py 为每个视角生成独立的数据集：
 
 ```bash
 # 使用 conda 环境
-conda activate fina-dashboard
+conda activate recon
 
 # 启动服务器
 bash load.sh
