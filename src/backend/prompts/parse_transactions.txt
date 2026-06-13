@@ -38,6 +38,11 @@ Each element must be an object with these exact fields:
 ### balance
 - The account balance AFTER this transaction was posted.
 - If the statement shows a running balance per transaction, use that value.
+- If the balance column is BLANK for a particular row, INFER it from the previous transaction's balance:
+  - For an income (credit/deposit): inferred_balance = previous_balance + amount
+  - For an expense (debit/withdrawal): inferred_balance = previous_balance - amount
+- The B/F BALANCE (brought forward) row is the starting balance of the statement period. Use it as the reference point for inferring subsequent balances. Do NOT extract B/F BALANCE itself as a transaction.
+- Never output null for balance — always provide a number, either from the statement or inferred.
 
 ### date
 - Format: YYYY-MM-DD (e.g. 2026-03-01)

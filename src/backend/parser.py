@@ -351,8 +351,8 @@ def assign_transaction_ids(
             "type_code": type_code,
             "cashflow_direction": cashflow_direction,
             "currency": str(raw.get("currency", "01")),
-            "amount": round(float(raw.get("amount", 0)), 2),
-            "balance": round(float(raw.get("balance", 0)), 2),
+            "amount": round(float(raw.get("amount") or 0), 2),
+            "balance": round(float(raw.get("balance") or 0), 2),
             "category": str(raw.get("category", "Other")),
             "description": str(raw.get("description", "")),
             "raw_text": str(raw.get("raw_text", "")),
@@ -417,6 +417,11 @@ def validate_transactions(
             float(raw["amount"])
         except (ValueError, TypeError):
             logger.warning("Skipping entry %d, invalid amount: %s", i, raw.get("amount"))
+            continue
+        try:
+            float(raw["balance"])
+        except (ValueError, TypeError):
+            logger.warning("Skipping entry %d, invalid balance (None/null): %s", i, raw.get("balance"))
             continue
         valid.append(raw)
     return valid

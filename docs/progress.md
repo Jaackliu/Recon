@@ -535,6 +535,19 @@
   - `msg.fx_error` 和 `msg.manual_refresh` 保持 `[manual]` 不变（均为手动触发）。
 - 修改文件：`multi-lang.json`
 
+## 2026-06-12 (修复 balance 为 null 导致的解析崩溃)
+
+- **问题**：6.12 解析 fail，`msg.parse_error` 通知显示 `TypeError: float() argument must be a string or a real number, not 'NoneType'`，发生在 `assign_transaction_ids` 第 355 行。
+- **代码层根因**：AI 大模型对部分交易返回 `"balance": null`（即 Python `None`）。Python `dict.get("balance", 0)` 的默认值仅在 key 不存在时生效，当 key 存在但值为 `None` 时，`.get()` 返回 `None` 而非默认值 `0`，导致 `float(None)` 抛出 `TypeError`。
+- **AI 返回 null 的根因**：HSBC 账单采用「同一天交易共享一行余额」的格式——只有当日最后一条（或支出条目）才打印余额，入账条目（如 CASH REBATE）的余额列为空白。AI 面对空列不知道能否自行推算，Prompt 也缺少「余额缺失时请推算」的指令，于是保守返回 `null`。
+- **为什么验证没拦住**：`validate_transactions()` 只检查 balance key 是否存在（`REQUIRED_FIELDS - set(raw.keys())`），不像 amount 那样用 `float()` 验证值是否合法。`{"balance": None}` 的 key 存在，直接通过验证。
+- **修复（三层加固）**：
+  - `validate_transactions()` 行 421-425：新增 `float(raw["balance"])` 值校验，拒绝 balance 为 null/invalid 的交易（类似已有的 amount 校验）。
+  - `assign_transaction_ids()` 行 354-355：`raw.get("balance", 0)` → `raw.get("balance") or 0`（`amount` 同理），防御性处理 `None` 值。Python `or` 运算符对 `None`、空字符串、缺失 key（返回 `None`）均正确处理。
+  - `parse_transactions.txt` prompt：新增余额推断规则——当余额列为空白时，根据上一条交易的余额推算（收入: prev + amount, 支出: prev - amount）；明确禁止输出 null；B/F BALANCE 仅作推算基准不提取为交易。
+  - `check_transactions.py` 的 `parse_float()` 已正确使用 try/except 返回 `None`，无需修改。
+- 修改文件：`src/backend/parser.py`、`src/backend/prompts/parse_transactions.txt`
+
 ## Notes
 - Processor implementation complete; ready to run against sample data.
 - Parser implementation complete; processes PDFs via multimodal AI API.
