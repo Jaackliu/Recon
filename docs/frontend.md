@@ -36,6 +36,7 @@
     *   **金额**：带正负号的交易金额。
     *   **余额**：该笔交易后的帐户余额。
     *   **Hover Tooltip**：鼠标悬停于任意交易行时，行高亮并在光标旁弹出浮窗，展示 `transactions.json` 中该笔交易的全部字段（含 `transaction_id`、`account_code`、`type_code`、`currency`、`raw_text`、`processed_at`、`source_hash` 等）。
+    *   **Double-Click Edit**：双击任意交易行打开编辑弹窗，可修改 **Category**（下拉选项，根据交易类型显示对应有效类别）和 **Description**（文本字段）。其余字段只读展示。点击保存后变更写入 `transactions.json` 并自动刷新页面。此功能在交易列表视图、每日详情弹窗（模块 E）、类别详情弹窗（模块 F/G）中均可用。
     *   *注：此视图依然受左侧控制栏的全局账户和时间筛选影响。*
 
 ---

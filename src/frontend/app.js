@@ -142,7 +142,11 @@ const dom = {
   deleteConfigBtn: document.getElementById("deleteConfigBtn"),
   abortOverlay: document.getElementById("abortOverlay"),
   abortCancel: document.getElementById("abortCancel"),
-  abortConfirm: document.getElementById("abortConfirm")
+  abortConfirm: document.getElementById("abortConfirm"),
+  editTxOverlay: document.getElementById("editTxOverlay"),
+  editTxCancel: document.getElementById("editTxCancel"),
+  editTxSave: document.getElementById("editTxSave"),
+  editTxFields: document.getElementById("editTxFields")
 };
 
 const palette = ["#ff385c", "#ff8b5a", "#f5c542", "#33b28a", "#2f80ed", "#222222", "#ff9aa7"];
@@ -1483,6 +1487,17 @@ function bindEvents() {
   dom.abortOverlay.addEventListener("click", (event) => {
     if (event.target === dom.abortOverlay) closeAbortConfirmModal();
   });
+
+  // Edit transaction modal
+  dom.editTxCancel.addEventListener("click", closeEditTxModal);
+  dom.editTxSave.addEventListener("click", handleSaveTxEdit);
+  dom.editTxOverlay.addEventListener("click", (event) => {
+    if (event.target === dom.editTxOverlay) closeEditTxModal();
+  });
+
+  // Double-click on transaction rows opens edit modal
+  dom.transactionsList.addEventListener("dblclick", handleTxDoubleClick);
+  dom.detailList.addEventListener("dblclick", handleTxDoubleClick);
 
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
     if (state.theme === "system") {
@@ -2991,6 +3006,115 @@ function escapeHtml(text) {
     "'": "&#039;"
   };
   return String(text).replace(/[&<>"']/g, (match) => map[match]);
+}
+
+/* ---- Transaction Edit ---- */
+
+const CATEGORY_OPTIONS = {
+  income: ["External Transfer", "Salary", "Scholarship", "Subsidy", "Tax & Interest", "Other"],
+  expense: ["Transportation", "Food", "Living", "Shopping", "Housing", "Entertainment", "Subscription", "Telecom", "Administrative", "External Transfer", "Other"]
+};
+
+function getCategoryOptions(type) {
+  return CATEGORY_OPTIONS[type] || CATEGORY_OPTIONS.expense;
+}
+
+let _editTxTarget = null;
+
+function handleTxDoubleClick(event) {
+  const row = event.target.closest(".transaction-row, .detail-row");
+  if (!row || !row._txData) return;
+  openEditTxModal(row._txData);
+}
+
+function openEditTxModal(txData) {
+  _editTxTarget = txData;
+  const currency = getCurrencyByCode(txData.currency);
+  const currencyLabel = currency ? `${getAlias(currency.alias)} (${currency.currency_symbol})` : (txData.currency || "-");
+  const options = getCategoryOptions(txData.type).map((cat) =>
+    `<option value="${cat}" ${cat === txData.category ? "selected" : ""}>${escapeHtml(translateCategory(cat))}</option>`
+  ).join("");
+
+  dom.editTxFields.innerHTML = `
+    <div class="edit-tx-field">
+      <span class="field-label">${t("tooltip.transactionId")}</span>
+      <span class="field-value">${escapeHtml(txData.id || "-")}</span>
+    </div>
+    <div class="edit-tx-field">
+      <span class="field-label">${t("tooltip.date")}</span>
+      <span class="field-value">${escapeHtml(formatDateWithWeekday(txData.date))}</span>
+    </div>
+    <div class="edit-tx-field">
+      <span class="field-label">${t("tooltip.accountAlias")}</span>
+      <span class="field-value">${escapeHtml(getAlias(txData.alias))}</span>
+    </div>
+    <div class="edit-tx-field">
+      <span class="field-label">${t("detail.type")}</span>
+      <span class="field-value">${escapeHtml(formatType(txData.type))}</span>
+    </div>
+    <div class="edit-tx-field">
+      <span class="field-label">${t("tooltip.amount")}</span>
+      <span class="field-value">${escapeHtml(formatSignedMoney(txData.amount, txData.cashflow_direction))}</span>
+    </div>
+    <div class="edit-tx-field">
+      <span class="field-label">${t("tooltip.balance")}</span>
+      <span class="field-value">${escapeHtml(formatMoney(txData.balance, txData.currency))}</span>
+    </div>
+    <div class="edit-tx-field">
+      <span class="field-label">${t("tooltip.currency")}</span>
+      <span class="field-value">${escapeHtml(currencyLabel)}</span>
+    </div>
+    <div class="edit-tx-field">
+      <span class="field-label">${t("tooltip.category")}</span>
+      <select id="editTxCategory">${options}</select>
+    </div>
+    <div class="edit-tx-field">
+      <span class="field-label">${t("tooltip.description")}</span>
+      <input type="text" id="editTxDescription" value="${escapeHtml(txData.description || "")}" maxlength="200" />
+    </div>
+  `;
+
+  dom.editTxOverlay.style.display = "";
+  dom.editTxOverlay.setAttribute("aria-hidden", "false");
+}
+
+function closeEditTxModal() {
+  dom.editTxOverlay.style.display = "none";
+  dom.editTxOverlay.setAttribute("aria-hidden", "true");
+  _editTxTarget = null;
+}
+
+async function handleSaveTxEdit() {
+  if (!_editTxTarget) return;
+  const categoryEl = document.getElementById("editTxCategory");
+  const descriptionEl = document.getElementById("editTxDescription");
+  if (!categoryEl || !descriptionEl) return;
+
+  const category = categoryEl.value.trim();
+  const description = descriptionEl.value.trim();
+  if (!category || !description) {
+    showToast(t("toast.transactionUpdateFailed"), true);
+    return;
+  }
+
+  const txId = _editTxTarget.id;
+  try {
+    const res = await fetch(`/${USER_ID}/api/transactions/${encodeURIComponent(txId)}/update`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ category, description })
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || "Unknown error");
+    }
+    closeEditTxModal();
+    showToast(t("toast.transactionUpdated"));
+    setTimeout(() => location.reload(), 600);
+  } catch (err) {
+    showToast(t("toast.transactionUpdateFailed"), true);
+    console.error("Failed to update transaction:", err);
+  }
 }
 
 /* ---- Transaction Tooltip ---- */

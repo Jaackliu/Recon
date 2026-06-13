@@ -661,6 +661,50 @@ def put_currencies(user_id):
     return jsonify({"status": "ok", "count": len(body)})
 
 
+@app.route("/<user_id>/api/transactions/<transaction_id>/update", methods=["POST"])
+def update_transaction(user_id, transaction_id):
+    """Update category and description of a single transaction."""
+    if not get_user(user_id):
+        abort(404)
+    data_dir = user_data_dir(user_id)
+    transactions_path = data_dir / "database" / "transactions.json"
+    if not transactions_path.exists():
+        return jsonify({"error": "transactions.json not found"}), 404
+    try:
+        transactions = json.loads(transactions_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as e:
+        return jsonify({"error": f"Failed to read transactions.json: {e}"}), 500
+
+    body = request.get_json(silent=True)
+    if not body:
+        return jsonify({"error": "Request body is required"}), 400
+    category = body.get("category", "").strip()
+    description = body.get("description", "").strip()
+    if not category or not description:
+        return jsonify({"error": "category and description are required"}), 400
+
+    found = False
+    for tx in transactions:
+        if tx.get("transaction_id") == transaction_id:
+            tx["category"] = category
+            tx["description"] = description
+            found = True
+            break
+
+    if not found:
+        return jsonify({"error": f"Transaction {transaction_id} not found"}), 404
+
+    with transactions_path.open("w", encoding="utf-8") as f:
+        json.dump(transactions, f, indent=2, ensure_ascii=False)
+
+    # Re-run processor to regenerate UI data
+    ok, info = _run_script("processor.py", user_id)
+    if not ok:
+        return jsonify({"error": f"Processor failed: {info}"}), 500
+
+    return jsonify({"status": "ok", "transaction_id": transaction_id})
+
+
 if __name__ == "__main__":
     for user in load_users():
         d = ROOT / user["data_dir"]

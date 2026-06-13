@@ -548,6 +548,25 @@
   - `check_transactions.py` 的 `parse_float()` 已正确使用 try/except 返回 `None`，无需修改。
 - 修改文件：`src/backend/parser.py`、`src/backend/prompts/parse_transactions.txt`
 
+## 2026-06-13 (双击编辑交易记录)
+
+- **需求**：双击任意 transaction entry 打开编辑弹窗，可修改 Category（下拉选项）和 Description（文本字段），其余字段只读。保存后写入 `transactions.json` 并自动刷新页面。此功能需在所有显示交易记录的地方可用（交易列表页、每日详情弹窗、类别详情弹窗）。
+- **后端修改**：
+  - `api_server.py`：新增 `POST /<user_id>/api/transactions/<transaction_id>/update` 端点，接收 `category` 和 `description`，更新 `transactions.json` 后自动运行 `processor.py` 刷新 UI 数据。
+- **前端修改**：
+  - `index.html`：新增 `#editTxOverlay` 编辑弹窗（含标题、动态字段区、取消/保存按钮）。
+  - `styles.css`：新增 `.edit-tx-overlay`、`.edit-tx-dialog`、`.edit-tx-fields`、`.edit-tx-field`、`.edit-tx-actions`、`.pill-accent` 样式，使用与 abort overlay 一致的 scrim + backdrop-blur 设计语言。
+  - `app.js`：
+    - 新增 DOM 引用：`editTxOverlay`、`editTxCancel`、`editTxSave`、`editTxFields`。
+    - 新增 `CATEGORY_OPTIONS` 常量（income/expense 分类枚举）。
+    - 新增 `getCategoryOptions()`、`handleTxDoubleClick()`、`openEditTxModal()`、`closeEditTxModal()`、`handleSaveTxEdit()` 函数。
+    - 在 `#transactionsList` 和 `#detailList` 上绑定 `dblclick` 事件委托，通过 `row._txData` 获取交易数据（两个容器均已存在 `_txData` 赋值，无需改动渲染逻辑）。
+- **多语言**：
+  - `multi-lang.json`：新增 `modal.editTransaction`、`toast.transactionUpdated`、`toast.transactionUpdateFailed` 翻译键（zh/en/fr）。
+- **文档更新**：
+  - `frontend.md`：交易列表显示字段新增 Double-Click Edit 说明，涵盖所有使用场景。
+  - `progress.md`：记录完整实现细节。
+
 ## Notes
 - Processor implementation complete; ready to run against sample data.
 - Parser implementation complete; processes PDFs via multimodal AI API.
